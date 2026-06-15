@@ -1,0 +1,23 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "men-eat-pb-feedback-api",
+  "main": "feedback-api/src/index.ts",
+  "compatibility_date": "2026-06-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "vars": {
+    "ALLOWED_ORIGINS": "*",
+    "REVIEW_BASE_URL": ""
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "men-eat-pb-feedback",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "feedback-api/migrations"
+    }
+  ]
+}

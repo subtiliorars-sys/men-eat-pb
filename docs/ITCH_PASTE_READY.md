@@ -57,9 +57,11 @@ Also in the JimmyTheHat fleet: Driving Me Nuts, Yes Man, No Is a Complete Senten
 Before packaging, set the direct feedback API and/or the community issue fallback:
 
 ```powershell
-$env:VITE_PLAYTEST_FEEDBACK_API_URL="https://example.com/api/feedback"
+$env:VITE_PLAYTEST_FEEDBACK_API_URL="https://example.com/feedback"
 $env:VITE_PLAYTEST_FEEDBACK_URL="https://github.com/OWNER/men-eat-pb/issues/new?template=playtest-feedback.md"
 ```
+
+If using the included Worker API, deploy it first (`docs/PLAYTEST_FEEDBACK.md`) and use its `/feedback` endpoint here.
 
 ```powershell
 cd C:\Users\hrmread\men-eat-pb

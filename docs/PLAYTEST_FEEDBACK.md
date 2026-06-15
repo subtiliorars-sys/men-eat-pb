@@ -25,7 +25,7 @@ Copy `.env.example` to `.env.local` for local testing or set these variables in 
 | --- | --- |
 | `VITE_PLAYTEST_FEEDBACK_API_URL` | Public POST endpoint for in-game feedback submissions. |
 | `VITE_PLAYTEST_FEEDBACK_URL` | Fallback issue/form URL for "Open issue instead". |
-| `VITE_PLAYTEST_ADMIN_API_URL` | Volunteer review API root. Defaults to `VITE_PLAYTEST_FEEDBACK_API_URL` when unset. |
+| `VITE_PLAYTEST_ADMIN_API_URL` | Volunteer review API root. If unset, the admin strips a trailing `/feedback` from `VITE_PLAYTEST_FEEDBACK_API_URL`. |
 
 ### Direct feedback API
 
@@ -69,6 +69,63 @@ Successful response:
 ```
 
 Only the POST endpoint should be public. Add rate limits and spam checks at the API layer.
+
+## Included Cloudflare Worker API scaffold
+
+This repo includes an optional Worker/D1 backend in `feedback-api/`.
+
+Files:
+
+- `wrangler.jsonc` - Worker config with placeholder D1 database ID.
+- `feedback-api/migrations/0001_feedback_submissions.sql` - D1 schema.
+- `feedback-api/src/index.ts` - Worker entrypoint.
+- `feedback-api/src/handler.ts` - HTTP routing, CORS, auth, validation, and JSON responses.
+- `feedback-api/src/store.ts` - D1 and in-memory stores.
+
+Local setup:
+
+```bash
+cp .dev.vars.example .dev.vars
+# edit .dev.vars and set MODERATOR_TOKEN to a long random value
+npm run db:migrate:local
+npm run dev:api
+```
+
+Local frontend wiring:
+
+```bash
+VITE_PLAYTEST_FEEDBACK_API_URL="http://localhost:8787/feedback" npm run dev
+VITE_PLAYTEST_ADMIN_API_URL="http://localhost:8787" npm run dev:admin
+```
+
+Production setup checklist:
+
+1. Create the D1 database:
+   ```bash
+   wrangler d1 create men-eat-pb-feedback
+   ```
+2. Replace the placeholder `database_id` in `wrangler.jsonc`.
+3. Apply migrations:
+   ```bash
+   wrangler d1 migrations apply men-eat-pb-feedback --remote
+   ```
+4. Set the moderator token as a secret:
+   ```bash
+   wrangler secret put MODERATOR_TOKEN
+   ```
+5. Set `ALLOWED_ORIGINS` to the itch/page origin instead of `*`.
+6. Set `REVIEW_BASE_URL` to the deployed admin URL if you want submit responses to link reviewers there.
+7. Deploy:
+   ```bash
+   wrangler deploy
+   ```
+
+Security notes:
+
+- Public players only need `POST /feedback`.
+- Volunteers need `Authorization: Bearer <MODERATOR_TOKEN>` for `GET /feedback` and `PATCH /feedback/:id`.
+- The Worker hashes bearer tokens before comparison to avoid direct string comparison.
+- Keep `.dev.vars` and real Worker secrets out of git.
 
 ### GitHub issue queue
 
@@ -221,8 +278,9 @@ Only `POST /feedback` should be public. Volunteer review actions need authentica
 
 These choices are intentionally configurable and do not block playtesting:
 
-- Final public intake target: GitHub issues, GitLab issues, hosted form, or direct feedback API.
-- Volunteer auth model: shared moderator token, magic links, GitHub OAuth, or GitLab OAuth.
+- Final public intake target: included Worker API, GitHub issues, GitLab issues, or hosted form.
+- Volunteer auth model: the scaffold uses a shared moderator token; magic links, GitHub OAuth, or GitLab OAuth can replace it later.
 - Public policy copy for contact info and public review consent.
 - Final label names if the community already has a preferred taxonomy.
 - Whether approved feedback becomes issues automatically or waits for maintainer batching.
+- Production Cloudflare account/project ownership, D1 database ID, allowed origins, and admin hosting URL.

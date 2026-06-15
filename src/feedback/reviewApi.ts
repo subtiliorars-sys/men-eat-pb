@@ -39,7 +39,7 @@ interface ImportMetaEnv {
 const env = (import.meta as ImportMeta & { env?: ImportMetaEnv }).env;
 
 export const PLAYTEST_ADMIN_API_URL =
-  env?.VITE_PLAYTEST_ADMIN_API_URL ?? env?.VITE_PLAYTEST_FEEDBACK_API_URL ?? "";
+  env?.VITE_PLAYTEST_ADMIN_API_URL ?? inferApiRoot(env?.VITE_PLAYTEST_FEEDBACK_API_URL ?? "");
 
 export async function fetchReviewQueue(
   status: FeedbackStatus,
@@ -105,4 +105,8 @@ function readApiError(data: Record<string, unknown>, fallback: string): string {
 
 function trimTrailingSlash(value: string): string {
   return value.replace(/\/+$/, "");
+}
+
+function inferApiRoot(value: string): string {
+  return trimTrailingSlash(value).replace(/\/feedback$/, "");
 }

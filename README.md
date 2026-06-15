@@ -40,6 +40,14 @@ npm run dev:admin      # local admin.html
 npm run build:admin    # dist-admin/
 ```
 
+Optional feedback API:
+
+```bash
+cp .dev.vars.example .dev.vars
+npm run db:migrate:local
+npm run dev:api
+```
+
 Volunteer moderation uses `playtest`, `pending-review`, `approved`, `denied`, and `needs-info` labels. See `docs/PLAYTEST_FEEDBACK.md` for the full review workflow.
 
 ## Stack
