@@ -40,11 +40,12 @@ WHAT YOU GET NOW (v0.1)
 • Tap-to-chomp arcade loop on one picnic screen
 • Three Lunch Modifiers (Double Chunk, No Napkins, Crust Only)
 • Frenzy chains, Stuck Shut fails, jar-empty wins
+• End-run playtest feedback button for community notes
 • Browser play — no install
 
 EARLY ACCESS NOTE
 This is a vertical slice. Juice, meta upgrades, and Table Events are on the roadmap
-(WAVES.md). Reviews welcome; we're shipping the toy loop first.
+(WAVES.md). Reviews welcome; volunteer reviewers triage playtest notes.
 
 Also in the JimmyTheHat fleet: Driving Me Nuts, Yes Man, No Is a Complete Sentence.
 ```
@@ -52,6 +53,12 @@ Also in the JimmyTheHat fleet: Driving Me Nuts, Yes Man, No Is a Complete Senten
 ---
 
 ## Package & upload
+
+Before packaging, set `VITE_PLAYTEST_FEEDBACK_URL` to the community issue queue or form:
+
+```powershell
+$env:VITE_PLAYTEST_FEEDBACK_URL="https://github.com/OWNER/men-eat-pb/issues/new?template=playtest-feedback.md"
+```
 
 ```powershell
 cd C:\Users\hrmread\men-eat-pb

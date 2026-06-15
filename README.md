@@ -18,6 +18,19 @@ npm run verify   # tsc + tests + build
 1. Pick a **Lunch modifier** on the start overlay.
 2. Tap **Carl, Dave, Ben, or Ed** to chomp the nearest blob.
 3. Chain chomps → **Frenzy**. Five misses → **Stuck Shut**. Empty jar → win.
+4. After a run, click **Send feedback** to open the community playtest intake with the run summary attached.
+
+## Community playtesting
+
+Configure the playtest intake before a public build:
+
+```bash
+cp .env.example .env.local
+# Set VITE_PLAYTEST_FEEDBACK_URL to a GitHub/GitLab issue queue or form.
+npm run build
+```
+
+Volunteer moderation uses `playtest`, `pending-review`, `approved`, `denied`, and `needs-info` labels. See `docs/PLAYTEST_FEEDBACK.md` for the full review workflow.
 
 ## Stack
 

@@ -1,5 +1,9 @@
 import Phaser from "phaser";
 import {
+  createPlaytestFeedbackUrl,
+  createPlaytestRunSummary,
+} from "../feedback/playtestFeedback.js";
+import {
   chomp,
   createRun,
   crustCredits,
@@ -265,9 +269,9 @@ export class PicnicScene extends Phaser.Scene {
 
   private createEndOverlay(): Phaser.GameObjects.Container {
     const bg = this.add.rectangle(WORLD.width / 2, WORLD.height / 2, WORLD.width, WORLD.height, 0x000000, 0.6);
-    const panel = this.add.rectangle(WORLD.width / 2, WORLD.height / 2, 340, 200, COLORS.hudBg).setStrokeStyle(4, COLORS.mouth);
+    const panel = this.add.rectangle(WORLD.width / 2, WORLD.height / 2, 380, 250, COLORS.hudBg).setStrokeStyle(4, COLORS.mouth);
     const title = this.add
-      .text(WORLD.width / 2, WORLD.height / 2 - 50, "Run over", {
+      .text(WORLD.width / 2, WORLD.height / 2 - 80, "Run over", {
         fontSize: "22px",
         fontStyle: "bold",
         color: "#5c3d1e",
@@ -275,12 +279,20 @@ export class PicnicScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setName("endTitle");
     const msg = this.add
-      .text(WORLD.width / 2, WORLD.height / 2 - 5, "", { fontSize: "14px", color: "#6b5344", align: "center", wordWrap: { width: 280 } })
+      .text(WORLD.width / 2, WORLD.height / 2 - 35, "", { fontSize: "14px", color: "#6b5344", align: "center", wordWrap: { width: 300 } })
       .setOrigin(0.5)
       .setName("endMsg");
+    const feedbackPrompt = this.add
+      .text(WORLD.width / 2, WORLD.height / 2 + 25, "Community playtesters can send notes for volunteer review.", {
+        fontSize: "12px",
+        color: "#6b5344",
+        align: "center",
+        wordWrap: { width: 310 },
+      })
+      .setOrigin(0.5);
 
     const retry = this.add
-      .text(WORLD.width / 2, WORLD.height / 2 + 55, "Another jar", {
+      .text(WORLD.width / 2 + 90, WORLD.height / 2 + 80, "Another jar", {
         fontSize: "16px",
         fontStyle: "bold",
         backgroundColor: "#d4a017",
@@ -290,9 +302,21 @@ export class PicnicScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setInteractive({ useHandCursor: true });
 
-    retry.on("pointerdown", () => this.restartRun());
+    const feedback = this.add
+      .text(WORLD.width / 2 - 85, WORLD.height / 2 + 80, "Send feedback", {
+        fontSize: "16px",
+        fontStyle: "bold",
+        backgroundColor: "#5c3d1e",
+        color: "#ffffff",
+        padding: { x: 14, y: 8 },
+      })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true });
 
-    const container = this.add.container(0, 0, [bg, panel, title, msg, retry]);
+    retry.on("pointerdown", () => this.restartRun());
+    feedback.on("pointerdown", () => this.openPlaytestFeedback());
+
+    const container = this.add.container(0, 0, [bg, panel, title, msg, feedbackPrompt, feedback, retry]);
     container.setDepth(60);
     return container;
   }
@@ -311,6 +335,18 @@ export class PicnicScene extends Phaser.Scene {
       msg.setText(`Too much peanut butter.\nCrust Credits: ${credits}`);
     }
     this.endOverlay.setVisible(true);
+  }
+
+  private openPlaytestFeedback(): void {
+    if (!this.state?.ended) return;
+
+    const feedbackUrl = createPlaytestFeedbackUrl(createPlaytestRunSummary(this.state));
+    if (feedbackUrl.startsWith("mailto:")) {
+      window.location.href = feedbackUrl;
+      return;
+    }
+
+    window.open(feedbackUrl, "_blank", "noopener,noreferrer");
   }
 
   private restartRun(): void {
