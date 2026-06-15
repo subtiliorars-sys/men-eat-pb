@@ -35,7 +35,6 @@ const COLORS = {
 export class PicnicScene extends Phaser.Scene {
   private state: RunState | null = null;
   private blobSprites = new Map<number, Phaser.GameObjects.Arc>();
-  private manContainers = new Map<ManId, Phaser.GameObjects.Container>();
   private hud!: Phaser.GameObjects.Text;
   private overlay!: Phaser.GameObjects.Container;
   private endOverlay!: Phaser.GameObjects.Container;
@@ -100,25 +99,26 @@ export class PicnicScene extends Phaser.Scene {
 
   private createMen(): void {
     for (const pos of MAN_POSITIONS) {
-      const head = this.add.circle(0, 0, 28, COLORS.skin).setStrokeStyle(3, COLORS.mouth);
-      const mouth = this.add.ellipse(0, 10, 24, 12, COLORS.mouth);
+      const head = this.add
+        .circle(pos.x, pos.y, 28, COLORS.skin)
+        .setStrokeStyle(3, COLORS.mouth)
+        .setInteractive({ useHandCursor: true });
+      const mouth = this.add.ellipse(pos.x, pos.y + 10, 24, 12, COLORS.mouth).setDepth(1);
       const label = this.add
-        .text(0, 38, pos.id, { fontSize: "12px", color: "#3d2914", fontStyle: "bold" })
-        .setOrigin(0.5, 0);
+        .text(pos.x, pos.y + 38, pos.id, { fontSize: "12px", color: "#3d2914", fontStyle: "bold" })
+        .setOrigin(0.5, 0)
+        .setDepth(2);
 
-      const container = this.add.container(pos.x, pos.y, [head, mouth, label]);
-      container.setSize(72, 72);
-      container.setInteractive(new Phaser.Geom.Circle(0, 0, 36), Phaser.Geom.Circle.Contains);
-      container.on("pointerdown", () => this.onManChomp(pos.id, container, mouth));
-      this.manContainers.set(pos.id, container);
+      head.on("pointerdown", () => this.onManChomp(pos.id, head, mouth));
+      head.setDepth(4);
     }
   }
 
-  private onManChomp(manId: ManId, container: Phaser.GameObjects.Container, mouth: Phaser.GameObjects.Ellipse): void {
+  private onManChomp(manId: ManId, head: Phaser.GameObjects.Arc, mouth: Phaser.GameObjects.Ellipse): void {
     if (!this.state?.running) return;
 
     this.tweens.add({
-      targets: container,
+      targets: head,
       scaleY: { from: 1, to: 1.12 },
       yoyo: true,
       duration: 80,

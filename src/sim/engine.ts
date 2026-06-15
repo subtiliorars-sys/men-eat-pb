@@ -17,6 +17,7 @@ const DIGESTION_RATE = 0.3;
 const FRENZY_DURATION = 10;
 const STUCK_SHUT_MISSES = 5;
 const STICKY_MS = 3000;
+const MAX_BLOBS = 30;
 
 export function createRun(modifier: ModifierId): RunState {
   const mod = modifierDef(modifier);
@@ -74,6 +75,9 @@ export function nearestBlob(
 }
 
 export function spawnBlob(state: RunState, rng: Rng): Blob {
+  if (state.blobs.length >= MAX_BLOBS) {
+    state.blobs.shift();
+  }
   const mod = modifierDef(state.modifier);
   const crunchy = rng.next() < mod.crunchyChance;
   const size = crunchy ? 22 + rng.next() * 12 : 28 + rng.next() * 16;

@@ -9,6 +9,7 @@ import {
   tick,
 } from "./engine.js";
 import { createSeededRng } from "./rng.js";
+import { CHOMP_REACH, MAN_POSITIONS, WORLD } from "./types.js";
 
 describe("createRun", () => {
   it("applies crust jar shrink", () => {
@@ -23,8 +24,8 @@ describe("chomp", () => {
     const run = createRun("double");
     run.blobs.push({
       id: 1,
-      x: 72,
-      y: 72,
+      x: 280,
+      y: 250,
       size: 30,
       crunchy: false,
       vx: 0,
@@ -52,8 +53,8 @@ describe("chomp", () => {
     for (let i = 0; i < 6; i++) {
       run.blobs.push({
         id: i + 1,
-        x: 72,
-        y: 72,
+        x: 280,
+        y: 250,
         size: 20,
         crunchy: false,
         vx: 0,
@@ -93,7 +94,7 @@ describe("nearestBlob", () => {
       vx: 0,
       vy: 0,
     });
-    expect(nearestBlob(run, 72, 72)).toBeNull();
+    expect(nearestBlob(run, 40, 40)).toBeNull();
   });
 });
 
@@ -105,7 +106,24 @@ describe("crustCredits", () => {
   });
 });
 
-describe("spawnBlob", () => {
+describe("reachability", () => {
+  it("men can reach center spawn zone within CHOMP_REACH", () => {
+    const cx = WORLD.width * 0.5;
+    const cy = WORLD.height * 0.47;
+    for (const man of MAN_POSITIONS) {
+      expect(Math.hypot(man.x - cx, man.y - cy)).toBeLessThan(CHOMP_REACH);
+    }
+  });
+});
+
+describe("spawnBlob cap", () => {
+  it("evicts oldest blob at MAX_BLOBS", () => {
+    const run = createRun("double");
+    const rng = createSeededRng(1);
+    for (let i = 0; i < 35; i++) spawnBlob(run, rng);
+    expect(run.blobs.length).toBeLessThanOrEqual(30);
+  });
+
   it("is deterministic with seeded rng", () => {
     const a = createRun("double");
     const b = createRun("double");

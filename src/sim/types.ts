@@ -44,24 +44,24 @@ export interface ChompResult {
 
 export const MAN_IDS: ManId[] = ["Carl", "Dave", "Ben", "Ed"];
 
-export const CHOMP_REACH = 120;
+export const CHOMP_REACH = 140;
 
 export const WORLD = {
   width: 800,
   height: 600,
-  spawnXMin: 0.25,
-  spawnXMax: 0.75,
-  spawnYMin: 0.32,
-  spawnYMax: 0.6,
-  blobBounceXMin: 40,
-  blobBounceXMax: 760,
-  blobBounceYMin: 192,
-  blobBounceYMax: 360,
+  spawnXMin: 0.28,
+  spawnXMax: 0.72,
+  spawnYMin: 0.36,
+  spawnYMax: 0.58,
+  blobBounceXMin: 180,
+  blobBounceXMax: 620,
+  blobBounceYMin: 210,
+  blobBounceYMax: 350,
 } as const;
 
 export const MAN_POSITIONS: ManPosition[] = [
-  { id: "Carl", x: 72, y: 72 },
-  { id: "Dave", x: 728, y: 72 },
-  { id: "Ben", x: 72, y: 528 },
-  { id: "Ed", x: 728, y: 528 },
+  { id: "Carl", x: 280, y: 250 },
+  { id: "Dave", x: 520, y: 250 },
+  { id: "Ben", x: 280, y: 310 },
+  { id: "Ed", x: 520, y: 310 },
 ];

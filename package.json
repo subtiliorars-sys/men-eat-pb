@@ -10,7 +10,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "verify": "tsc --noEmit && vitest run && vite build"
+    "verify": "tsc --noEmit && vitest run && vite build",
+    "package:itch": "powershell -ExecutionPolicy Bypass -File ./scripts/package-itchio.ps1"
   },
   "dependencies": {
     "phaser": "^3.87.0"
