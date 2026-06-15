@@ -9,6 +9,10 @@ labels: playtest,pending-review
 
 <!-- Tell us what felt fun, confusing, unfair, too easy, too hard, broken, or worth keeping. -->
 
+Category:
+Contact:
+Public review OK:
+
 ## Run summary
 
 <!-- The game can prefill this when opened from the end screen. If not, add what you remember. -->

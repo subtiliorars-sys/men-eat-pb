@@ -54,9 +54,10 @@ Also in the JimmyTheHat fleet: Driving Me Nuts, Yes Man, No Is a Complete Senten
 
 ## Package & upload
 
-Before packaging, set `VITE_PLAYTEST_FEEDBACK_URL` to the community issue queue or form:
+Before packaging, set the direct feedback API and/or the community issue fallback:
 
 ```powershell
+$env:VITE_PLAYTEST_FEEDBACK_API_URL="https://example.com/api/feedback"
 $env:VITE_PLAYTEST_FEEDBACK_URL="https://github.com/OWNER/men-eat-pb/issues/new?template=playtest-feedback.md"
 ```
 

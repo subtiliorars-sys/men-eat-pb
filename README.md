@@ -26,8 +26,18 @@ Configure the playtest intake before a public build:
 
 ```bash
 cp .env.example .env.local
-# Set VITE_PLAYTEST_FEEDBACK_URL to a GitHub/GitLab issue queue or form.
+# Optional direct API:
+# VITE_PLAYTEST_FEEDBACK_API_URL=https://example.com/api/feedback
+# Optional issue/form fallback:
+# VITE_PLAYTEST_FEEDBACK_URL=https://github.com/OWNER/men-eat-pb/issues/new?template=playtest-feedback.md
 npm run build
+```
+
+Volunteer review UI:
+
+```bash
+npm run dev:admin      # local admin.html
+npm run build:admin    # dist-admin/
 ```
 
 Volunteer moderation uses `playtest`, `pending-review`, `approved`, `denied`, and `needs-info` labels. See `docs/PLAYTEST_FEEDBACK.md` for the full review workflow.

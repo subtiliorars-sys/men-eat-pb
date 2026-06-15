@@ -1,8 +1,6 @@
 import Phaser from "phaser";
-import {
-  createPlaytestFeedbackUrl,
-  createPlaytestRunSummary,
-} from "../feedback/playtestFeedback.js";
+import { openPlaytestFeedbackDialog } from "../feedback/feedbackDialog.js";
+import { createPlaytestRunSummary } from "../feedback/playtestFeedback.js";
 import {
   chomp,
   createRun,
@@ -340,13 +338,7 @@ export class PicnicScene extends Phaser.Scene {
   private openPlaytestFeedback(): void {
     if (!this.state?.ended) return;
 
-    const feedbackUrl = createPlaytestFeedbackUrl(createPlaytestRunSummary(this.state));
-    if (feedbackUrl.startsWith("mailto:")) {
-      window.location.href = feedbackUrl;
-      return;
-    }
-
-    window.open(feedbackUrl, "_blank", "noopener,noreferrer");
+    openPlaytestFeedbackDialog(createPlaytestRunSummary(this.state));
   }
 
   private restartRun(): void {
