@@ -17,6 +17,14 @@ This keeps the itch build lightweight while leaving room for a volunteer moderat
 
 The generated report includes build version, modifier, ending, spoons, Crust Credits, jar remaining, Frenzy state, and chain count.
 
+## Recruiting and volunteer operations
+
+Use these docs when the feedback loop is deployed:
+
+- `docs/COMMUNITY_PLAYTEST_LAUNCH.md` - staged launch plan and readiness checklist.
+- `docs/OUTREACH_COPY.md` - copy/paste recruiting posts for players and reviewers.
+- `docs/VOLUNTEER_REVIEWER_GUIDE.md` - reviewer onboarding, decision rules, and escalation process.
+
 ## Configure intake
 
 Copy `.env.example` to `.env.local` for local testing or set these variables in the release environment.

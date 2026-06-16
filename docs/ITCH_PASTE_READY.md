@@ -90,3 +90,9 @@ Create the empty itch project with slug `jimmythehat-men-eat-pb` first in the da
 ## Cover art (placeholder)
 
 Until commissioned art: use a screenshot from `npm run dev` (Frenzy moment) at 630×500, or regenerate via fleet store-asset scripts when added.
+
+---
+
+## Playtest recruiting
+
+After the build is live, use `docs/OUTREACH_COPY.md` for the itch devlog and social posts. Start with the reviewer seed group from `docs/COMMUNITY_PLAYTEST_LAUNCH.md` before posting broadly.

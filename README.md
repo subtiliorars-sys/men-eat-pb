@@ -50,6 +50,12 @@ npm run dev:api
 
 Volunteer moderation uses `playtest`, `pending-review`, `approved`, `denied`, and `needs-info` labels. See `docs/PLAYTEST_FEEDBACK.md` for the full review workflow.
 
+Recruiting/playtest operations:
+
+- `docs/COMMUNITY_PLAYTEST_LAUNCH.md` - staged launch runbook.
+- `docs/OUTREACH_COPY.md` - copy/paste posts for social, Discord, itch, Reddit, and recaps.
+- `docs/VOLUNTEER_REVIEWER_GUIDE.md` - reviewer onboarding and triage SOP.
+
 ## Stack
 
 Phaser 3 + TypeScript + Vite. Game logic lives in `src/sim/` (unit-tested).
