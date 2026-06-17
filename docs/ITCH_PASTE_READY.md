@@ -40,11 +40,12 @@ WHAT YOU GET NOW (v0.1)
 • Tap-to-chomp arcade loop on one picnic screen
 • Three Lunch Modifiers (Double Chunk, No Napkins, Crust Only)
 • Frenzy chains, Stuck Shut fails, jar-empty wins
+• End-run playtest feedback button for community notes
 • Browser play — no install
 
 EARLY ACCESS NOTE
 This is a vertical slice. Juice, meta upgrades, and Table Events are on the roadmap
-(WAVES.md). Reviews welcome; we're shipping the toy loop first.
+(WAVES.md). Reviews welcome; volunteer reviewers triage playtest notes.
 
 Also in the JimmyTheHat fleet: Driving Me Nuts, Yes Man, No Is a Complete Sentence.
 ```
@@ -52,6 +53,15 @@ Also in the JimmyTheHat fleet: Driving Me Nuts, Yes Man, No Is a Complete Senten
 ---
 
 ## Package & upload
+
+Before packaging, set the direct feedback API and/or the community issue fallback:
+
+```powershell
+$env:VITE_PLAYTEST_FEEDBACK_API_URL="https://example.com/feedback"
+$env:VITE_PLAYTEST_FEEDBACK_URL="https://github.com/OWNER/men-eat-pb/issues/new?template=playtest-feedback.md"
+```
+
+If using the included Worker API, deploy it first (`docs/PLAYTEST_FEEDBACK.md`) and use its `/feedback` endpoint here.
 
 ```powershell
 cd C:\Users\hrmread\men-eat-pb
@@ -80,3 +90,9 @@ Create the empty itch project with slug `jimmythehat-men-eat-pb` first in the da
 ## Cover art (placeholder)
 
 Until commissioned art: use a screenshot from `npm run dev` (Frenzy moment) at 630×500, or regenerate via fleet store-asset scripts when added.
+
+---
+
+## Playtest recruiting
+
+After the build is live, use `docs/OUTREACH_COPY.md` for the itch devlog and social posts. Start with the reviewer seed group from `docs/COMMUNITY_PLAYTEST_LAUNCH.md` before posting broadly.

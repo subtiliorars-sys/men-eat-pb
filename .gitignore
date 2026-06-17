@@ -1,5 +1,9 @@
 node_modules/
 dist/
+dist-admin/
 release/*.zip
+.env.local
+.dev.vars
+.wrangler/
 .DS_Store
 *.log

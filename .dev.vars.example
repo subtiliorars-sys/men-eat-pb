@@ -1,0 +1,2 @@
+## Local-only Worker secrets. Copy to .dev.vars and do not commit the real token.
+MODERATOR_TOKEN=replace-with-a-long-random-token

@@ -24,6 +24,9 @@ Pending waves for the fleet worker. One PR per wave; run `npm run verify` before
 
 ## MEP-W5 — QA gate
 - [ ] `docs/QA_BROWSER.md` + dev QA bridge (DrivingMeNuts pattern)
+- [x] Community playtest feedback intake + volunteer review workflow
+- [x] Dynamic feedback API contract + separate volunteer admin scaffold
+- [x] Optional Worker/D1 feedback backend scaffold
 - [ ] game-provost tutorial audit
 
 ## Ethics

@@ -18,6 +18,43 @@ npm run verify   # tsc + tests + build
 1. Pick a **Lunch modifier** on the start overlay.
 2. Tap **Carl, Dave, Ben, or Ed** to chomp the nearest blob.
 3. Chain chomps → **Frenzy**. Five misses → **Stuck Shut**. Empty jar → win.
+4. After a run, click **Send feedback** to open the community playtest intake with the run summary attached.
+
+## Community playtesting
+
+Configure the playtest intake before a public build:
+
+```bash
+cp .env.example .env.local
+# Optional direct API:
+# VITE_PLAYTEST_FEEDBACK_API_URL=https://example.com/api/feedback
+# Optional issue/form fallback:
+# VITE_PLAYTEST_FEEDBACK_URL=https://github.com/OWNER/men-eat-pb/issues/new?template=playtest-feedback.md
+npm run build
+```
+
+Volunteer review UI:
+
+```bash
+npm run dev:admin      # local admin.html
+npm run build:admin    # dist-admin/
+```
+
+Optional feedback API:
+
+```bash
+cp .dev.vars.example .dev.vars
+npm run db:migrate:local
+npm run dev:api
+```
+
+Volunteer moderation uses `playtest`, `pending-review`, `approved`, `denied`, and `needs-info` labels. See `docs/PLAYTEST_FEEDBACK.md` for the full review workflow.
+
+Recruiting/playtest operations:
+
+- `docs/COMMUNITY_PLAYTEST_LAUNCH.md` - staged launch runbook.
+- `docs/OUTREACH_COPY.md` - copy/paste posts for social, Discord, itch, Reddit, and recaps.
+- `docs/VOLUNTEER_REVIEWER_GUIDE.md` - reviewer onboarding and triage SOP.
 
 ## Stack
 
