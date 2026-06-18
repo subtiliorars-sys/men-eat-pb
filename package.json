@@ -9,7 +9,7 @@
     "dev:admin": "vite --open /admin.html",
     "dev:api": "wrangler dev --config wrangler.jsonc",
     "start": "vite --open",
-    "build": "vite build",
+    "build": "node scripts/write-build-stamp.mjs && vite build",
     "build:admin": "vite build --config vite.admin.config.ts",
     "check:api": "tsc -p feedback-api/tsconfig.json --noEmit && wrangler deploy --dry-run --config wrangler.jsonc",
     "db:migrate:local": "wrangler d1 migrations apply men-eat-pb-feedback --local",

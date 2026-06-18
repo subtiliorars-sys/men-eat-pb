@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="corps-build" content="0.1.0+local" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Men Eat Peanut Butter — Playtest</title>
+  <style>
+    :root { --bg: #87ceeb; --ink: #1a1a2e; --btn: #c45c26; --panel: #fff; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+      background: var(--bg); color: var(--ink); min-height: 100vh; padding: 24px 16px 48px;
+    }
+    .wrap { max-width: 420px; margin: 0 auto; }
+    h1 { font-size: 1.6rem; margin: 0 0 8px; }
+    .lead { font-size: 1.05rem; line-height: 1.5; margin: 0 0 20px; }
+    .card {
+      background: var(--panel); border-radius: 16px; padding: 20px;
+      box-shadow: 0 4px 16px rgba(0,0,0,.08); margin-bottom: 16px;
+    }
+    .steps { margin: 0; padding-left: 1.2rem; line-height: 1.6; }
+    .play {
+      display: block; width: 100%; text-align: center;
+      background: var(--btn); color: #fff; font-size: 1.25rem; font-weight: 700;
+      padding: 18px 20px; border: none; border-radius: 14px; text-decoration: none;
+      margin-top: 8px;
+    }
+    .fine { font-size: .85rem; opacity: .85; line-height: 1.45; }
+    .build { font-size: .75rem; opacity: .6; margin-top: 20px; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <p style="font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;opacity:.7;margin:0 0 6px">Free browser playtest</p>
+    <h1>Men Eat Peanut Butter</h1>
+    <p class="lead">A short browser game. Tap below - nothing to install.</p>
+    <div class="card">
+      <ol class="steps">
+        <li>Tap <strong>Play now</strong></li>
+        <li>Try it for ~10 minutes</li>
+        <li>Share what felt good or confusing with your coordinator</li>
+      </ol>
+      <a class="play" href="./index.html">Play now</a>
+    </div>
+    <p class="fine">Works on your phone or computer. No download needed.</p>
+    <p class="build" id="build-line">Build loading...</p>
+  </div>
+  <script>
+    fetch('./build.json').then(function (r) { return r.ok ? r.json() : null; }).then(function (b) {
+      if (b) document.getElementById('build-line').textContent = 'Build v' + b.version + ' (' + b.sha + ')';
+    }).catch(function () {});
+  </script>
+</body>
+</html>
