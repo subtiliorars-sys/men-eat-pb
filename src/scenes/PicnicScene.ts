@@ -17,11 +17,17 @@ import {
   clickAnt,
   createRun,
   crustCredits,
+  eventRemaining,
   frenzyRemaining,
   frenzyThreshold,
+  isSticky,
   jarPercent,
+  missesUntilStuck,
+  startTableEvent,
+  stickyRemaining,
   tick,
 } from "../sim/engine.js";
+import { TABLE_EVENT_IDS, TABLE_EVENTS } from "../sim/events.js";
 import {
   UPGRADE_COSTS,
   addCredits,
@@ -38,6 +44,7 @@ import {
   type ManId,
   type ModifierId,
   type RunState,
+  type TableEventId,
 } from "../sim/types.js";
 
 const COLORS = {
@@ -54,6 +61,11 @@ const COLORS = {
   frenzy: 0xff6b35,
 };
 
+const JAR_X = WORLD.width / 2;
+const JAR_Y = WORLD.height * 0.44;
+const JAR_FILL_W = 28;
+const JAR_FILL_H = 32;
+
 export class PicnicScene extends Phaser.Scene {
   private state: RunState | null = null;
   private blobSprites = new Map<number, Phaser.GameObjects.Arc>();
@@ -61,12 +73,14 @@ export class PicnicScene extends Phaser.Scene {
   private hud!: Phaser.GameObjects.Text;
   private overlay!: Phaser.GameObjects.Container;
   private endOverlay!: Phaser.GameObjects.Container;
+  private eventOverlay!: Phaser.GameObjects.Container;
   private selectedMod: ModifierId = "double";
   private floatTexts: Phaser.GameObjects.Text[] = [];
   private wasFrenzy = false;
   private muteBtn!: Phaser.GameObjects.Text;
-
+  private jarFill!: Phaser.GameObjects.Rectangle;
   private frenzyBorder!: Phaser.GameObjects.Graphics;
+  private earnedThisRun = 0;
 
   constructor() {
     super("PicnicScene");
@@ -81,7 +95,7 @@ export class PicnicScene extends Phaser.Scene {
     this.hud = this.add
       .text(16, 12, "", {
         fontFamily: "system-ui, sans-serif",
-        fontSize: "16px",
+        fontSize: "15px",
         color: "#5c3d1e",
         backgroundColor: "#fff8dc",
         padding: { x: 8, y: 6 },
@@ -91,9 +105,32 @@ export class PicnicScene extends Phaser.Scene {
     this.createMuteButton();
 
     this.overlay = this.createStartOverlay();
+    this.eventOverlay = this.createEventOverlay();
     this.endOverlay = this.createEndOverlay();
+    this.eventOverlay.setVisible(false);
     this.endOverlay.setVisible(false);
-    (window as any).__MEP_QA__ = { flags: () => this.qaFlags(), click: (k: string) => { if (k === 'start-run') { this.qaClickStart(); return 'ok'; } if (k.startsWith('chomp-man-')) { this.qaClickMan(parseInt(k.split('-').pop() || '0')); return 'ok'; } if (k === 'retry') { this.qaClickRetry(); return 'ok'; } return 'error'; } };
+    this.installQaBridge();
+  }
+
+  private installQaBridge(): void {
+    (window as unknown as { __MEP_QA__?: unknown }).__MEP_QA__ = {
+      flags: () => this.qaFlags(),
+      click: (k: string) => {
+        if (k === "start-run") {
+          this.qaClickStart();
+          return "ok";
+        }
+        if (k.startsWith("chomp-man-")) {
+          this.qaClickMan(parseInt(k.split("-").pop() || "0", 10));
+          return "ok";
+        }
+        if (k === "retry") {
+          this.qaClickRetry();
+          return "ok";
+        }
+        return "error";
+      },
+    };
   }
 
   private createMuteButton(): void {
@@ -125,23 +162,36 @@ export class PicnicScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
-    if (!this.state?.running) return;
+    if (!this.state) return;
 
-    const dt = Math.min(delta / 1000, 0.05);
-    tick(this.state, dt, this.time.now, defaultRng);
+    if (this.state.running) {
+      const dt = Math.min(delta / 1000, 0.05);
+      tick(this.state, dt, this.time.now, defaultRng);
 
-    if (!this.state.frenzy && this.wasFrenzy) {
-      setMusicFrenzy(false);
-      this.wasFrenzy = false;
+      if (!this.state.frenzy && this.wasFrenzy) {
+        setMusicFrenzy(false);
+        this.wasFrenzy = false;
+      }
+
+      this.syncBlobs();
+      this.syncAnts();
+      this.updateHud();
+      this.updateJarFill();
+      this.updateFrenzyBorder();
+
+      if (this.state.ended) {
+        this.endRunAudio(this.state.ended);
+        this.finalizeRun();
+        this.showEndOverlay();
+      }
     }
 
-    this.syncBlobs();
-    this.syncAnts();
-    this.updateHud();
-    this.updateFrenzyBorder();
+    if (this.state.eventPending) {
+      this.eventOverlay.setVisible(true);
+    }
 
-    if (this.state.ended) {
-      this.endRunAudio(this.state.ended);
+    if (this.state.ended && !this.endOverlay.visible) {
+      this.finalizeRun();
       this.showEndOverlay();
     }
   }
@@ -160,9 +210,21 @@ export class PicnicScene extends Phaser.Scene {
   }
 
   private drawJar(): void {
-    const jar = this.add.rectangle(WORLD.width / 2, WORLD.height * 0.44, 36, 48, 0x444444).setStrokeStyle(2, 0x222222);
-    jar.setDepth(2);
-    this.add.rectangle(WORLD.width / 2, WORLD.height * 0.44 + 8, 28, 32, COLORS.creamy).setDepth(1);
+    this.add.rectangle(JAR_X, JAR_Y, 36, 48, 0x444444).setStrokeStyle(2, 0x222222).setDepth(2);
+    this.jarFill = this.add
+      .rectangle(JAR_X, JAR_Y + 8, JAR_FILL_W, JAR_FILL_H, COLORS.creamy)
+      .setDepth(3)
+      .setOrigin(0.5, 1);
+  }
+
+  private updateJarFill(): void {
+    if (!this.state) return;
+    const pct = jarPercent(this.state) / 100;
+    const h = Math.max(4, JAR_FILL_H * pct);
+    this.jarFill.setDisplaySize(JAR_FILL_W, h);
+    this.jarFill.setY(JAR_Y + 8 + (JAR_FILL_H - h) / 2);
+    const empty = pct < 0.25;
+    this.jarFill.setFillStyle(empty ? 0xe8c878 : COLORS.creamy);
   }
 
   private createMen(): void {
@@ -172,7 +234,7 @@ export class PicnicScene extends Phaser.Scene {
         .setStrokeStyle(3, COLORS.mouth)
         .setInteractive({ useHandCursor: true });
       const mouth = this.add.ellipse(pos.x, pos.y + 10, 24, 12, COLORS.mouth).setDepth(1);
-      const label = this.add
+      this.add
         .text(pos.x, pos.y + 38, pos.id, { fontSize: "12px", color: "#3d2914", fontStyle: "bold" })
         .setOrigin(0.5, 0)
         .setDepth(2);
@@ -201,9 +263,8 @@ export class PicnicScene extends Phaser.Scene {
   }
 
   private onManChomp(manId: ManId, head: Phaser.GameObjects.Arc, mouth: Phaser.GameObjects.Ellipse): void {
-    if (!this.state?.running) return;
+    if (!this.state?.running || this.state.eventPending) return;
 
-    // MEP-W2: Squash and Stretch
     this.tweens.add({
       targets: head,
       scaleY: { from: 1, to: 1.25 },
@@ -221,14 +282,16 @@ export class PicnicScene extends Phaser.Scene {
     });
 
     const result = chomp(this.state, manId, this.time.now);
+    const pos = MAN_POSITIONS.find((m) => m.id === manId)!;
+
     if (result.hit && result.value > 0) {
-      const pos = MAN_POSITIONS.find((m) => m.id === manId)!;
-      this.spawnFloatText(pos.x, pos.y - 20, `+${result.value % 1 ? result.value.toFixed(1) : result.value}`);
+      const label = result.value % 1 ? result.value.toFixed(1) : String(result.value);
+      this.spawnFloatText(pos.x, pos.y - 20, `+${label}`);
       playChomp(this.state.chain, result.value >= 3);
     } else if (!result.ended) {
       playMiss();
-      // MEP-W2: Miss splat visual
-      this.spawnMissSplat(head.x, head.y + 20);
+      this.spawnMissSplat(pos.x, pos.y + 18);
+      this.spawnFloatText(pos.x, pos.y - 10, "miss", 0xd94f4f);
     }
 
     if (this.state.frenzy && !this.wasFrenzy) {
@@ -238,9 +301,14 @@ export class PicnicScene extends Phaser.Scene {
     this.wasFrenzy = this.state.frenzy;
 
     this.syncBlobs();
+    this.syncAnts();
     this.updateHud();
-    if (result.ended) this.endRunAudio(result.ended);
-    if (result.ended) this.showEndOverlay();
+    this.updateJarFill();
+    if (result.ended) {
+      this.endRunAudio(result.ended);
+      this.finalizeRun();
+      this.showEndOverlay();
+    }
   }
 
   private spawnMissSplat(x: number, y: number): void {
@@ -318,7 +386,11 @@ export class PicnicScene extends Phaser.Scene {
 
   private spawnFloatText(x: number, y: number, text: string, color = 0x5c3d1e): void {
     const t = this.add
-      .text(x, y, text, { fontSize: "18px", fontStyle: "bold", color: Phaser.Display.Color.IntegerToColor(color).rgba })
+      .text(x, y, text, {
+        fontSize: "18px",
+        fontStyle: "bold",
+        color: Phaser.Display.Color.IntegerToColor(color).rgba,
+      })
       .setOrigin(0.5)
       .setDepth(30);
     this.floatTexts.push(t);
@@ -337,15 +409,29 @@ export class PicnicScene extends Phaser.Scene {
   private updateHud(): void {
     if (!this.state) return;
     const s = this.state;
+    const now = this.time.now;
     const frenzyLine = s.frenzy
       ? `FRENZY ${frenzyRemaining(s)}s`
       : `Frenzy in ${Math.max(0, frenzyThreshold(s) - s.chain)}`;
+    const missLine = `Misses: ${s.missStreak}/5 (${missesUntilStuck(s)} left)`;
+    const stickyLine = isSticky(s, now) ? `  |  STICKY ${stickyRemaining(s, now)}s` : "";
+    const eventLine = s.activeEvent
+      ? `  |  ${TABLE_EVENTS[s.activeEvent].label} ${eventRemaining(s)}s`
+      : "";
+
     this.hud.setText(
-      `Spoons: ${Math.floor(s.spoons)}  |  Jar: ${Math.ceil(jarPercent(s))}%  |  Chain: ${s.chain}  |  ${frenzyLine}`,
+      `Spoons: ${Math.floor(s.spoons)}  |  Jar: ${Math.ceil(jarPercent(s))}%  |  Chain: ${s.chain}\n${frenzyLine}  |  ${missLine}${stickyLine}${eventLine}`,
     );
+
     if (s.frenzy) {
       this.hud.setBackgroundColor("#ff6b35");
       this.hud.setColor("#ffffff");
+    } else if (s.missStreak >= 3) {
+      this.hud.setBackgroundColor("#f5d0d0");
+      this.hud.setColor("#5c1e1e");
+    } else if (isSticky(s, now)) {
+      this.hud.setBackgroundColor("#f5e6cc");
+      this.hud.setColor("#5c3d1e");
     } else {
       this.hud.setBackgroundColor("#fff8dc");
       this.hud.setColor("#5c3d1e");
@@ -354,9 +440,15 @@ export class PicnicScene extends Phaser.Scene {
 
   private createStartOverlay(): Phaser.GameObjects.Container {
     const bg = this.add.rectangle(WORLD.width / 2, WORLD.height / 2, WORLD.width, WORLD.height, 0x000000, 0.55);
-    const panel = this.add.rectangle(WORLD.width / 2, WORLD.height / 2, 360, 280, COLORS.hudBg).setStrokeStyle(4, COLORS.mouth);
+    const panel = this.add
+      .rectangle(WORLD.width / 2, WORLD.height / 2, 360, 280, COLORS.hudBg)
+      .setStrokeStyle(4, COLORS.mouth);
     const title = this.add
-      .text(WORLD.width / 2, WORLD.height / 2 - 90, "Picnic time", { fontSize: "24px", fontStyle: "bold", color: "#5c3d1e" })
+      .text(WORLD.width / 2, WORLD.height / 2 - 90, "Picnic time", {
+        fontSize: "24px",
+        fontStyle: "bold",
+        color: "#5c3d1e",
+      })
       .setOrigin(0.5);
     const sub = this.add
       .text(WORLD.width / 2, WORLD.height / 2 - 55, "Pick a lunch modifier, then tap a man to chomp.", {
@@ -406,12 +498,13 @@ export class PicnicScene extends Phaser.Scene {
         WORLD.height / 2 + 75,
         `${deeperJarLabel(prog.upgrades.deeperJar)}\n[${UPGRADE_COSTS.deeperJar}c]`,
         {
-        fontSize: "11px",
-        backgroundColor: "#f5e6cc",
-        color: "#5c3d1e",
-        align: "center",
-        padding: { x: 5, y: 5 },
-      })
+          fontSize: "11px",
+          backgroundColor: "#f5e6cc",
+          color: "#5c3d1e",
+          align: "center",
+          padding: { x: 5, y: 5 },
+        },
+      )
       .setOrigin(0.5)
       .setInteractive({ useHandCursor: true });
 
@@ -464,11 +557,7 @@ export class PicnicScene extends Phaser.Scene {
 
     startBtn.on("pointerdown", () => {
       playClick();
-      this.state = createRun(this.selectedMod);
-      this.wasFrenzy = false;
-      this.overlay.setVisible(false);
-      this.updateHud();
-      startMusic();
+      this.beginRun();
     });
 
     const container = this.add.container(0, 0, [
@@ -486,9 +575,70 @@ export class PicnicScene extends Phaser.Scene {
     return container;
   }
 
+  private createEventOverlay(): Phaser.GameObjects.Container {
+    const bg = this.add.rectangle(WORLD.width / 2, WORLD.height / 2, WORLD.width, WORLD.height, 0x000000, 0.65);
+    const panel = this.add
+      .rectangle(WORLD.width / 2, WORLD.height / 2, 400, 260, COLORS.hudBg)
+      .setStrokeStyle(4, COLORS.mouth);
+    const title = this.add
+      .text(WORLD.width / 2, WORLD.height / 2 - 90, "Table event!", {
+        fontSize: "22px",
+        fontStyle: "bold",
+        color: "#5c3d1e",
+      })
+      .setOrigin(0.5);
+    const sub = this.add
+      .text(WORLD.width / 2, WORLD.height / 2 - 58, "Halfway through the jar — pick your chaos:", {
+        fontSize: "13px",
+        color: "#6b5344",
+      })
+      .setOrigin(0.5);
+
+    const eventButtons: Phaser.GameObjects.Text[] = [];
+    TABLE_EVENT_IDS.forEach((id, i) => {
+      const def = TABLE_EVENTS[id];
+      const btn = this.add
+        .text(WORLD.width / 2, WORLD.height / 2 - 10 + i * 70, def.label, {
+          fontSize: "15px",
+          fontStyle: "bold",
+          backgroundColor: "#d4a017",
+          color: "#ffffff",
+          padding: { x: 12, y: 8 },
+        })
+        .setOrigin(0.5)
+        .setInteractive({ useHandCursor: true });
+      this.add
+        .text(WORLD.width / 2, WORLD.height / 2 + 18 + i * 70, def.description, {
+          fontSize: "11px",
+          color: "#6b5344",
+          wordWrap: { width: 340 },
+          align: "center",
+        })
+        .setOrigin(0.5);
+      btn.on("pointerdown", () => this.pickEvent(id));
+      eventButtons.push(btn);
+    });
+
+    const container = this.add.container(0, 0, [bg, panel, title, sub, ...eventButtons]);
+    container.setDepth(55);
+    return container;
+  }
+
+  private pickEvent(eventId: TableEventId): void {
+    if (!this.state?.eventPending) return;
+    playClick();
+    startTableEvent(this.state, eventId);
+    this.eventOverlay.setVisible(false);
+    this.wasFrenzy = this.state.frenzy;
+    this.updateHud();
+    this.updateJarFill();
+  }
+
   private createEndOverlay(): Phaser.GameObjects.Container {
     const bg = this.add.rectangle(WORLD.width / 2, WORLD.height / 2, WORLD.width, WORLD.height, 0x000000, 0.6);
-    const panel = this.add.rectangle(WORLD.width / 2, WORLD.height / 2, 380, 250, COLORS.hudBg).setStrokeStyle(4, COLORS.mouth);
+    const panel = this.add
+      .rectangle(WORLD.width / 2, WORLD.height / 2, 380, 250, COLORS.hudBg)
+      .setStrokeStyle(4, COLORS.mouth);
     const title = this.add
       .text(WORLD.width / 2, WORLD.height / 2 - 80, "Run over", {
         fontSize: "22px",
@@ -498,7 +648,12 @@ export class PicnicScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setName("endTitle");
     const msg = this.add
-      .text(WORLD.width / 2, WORLD.height / 2 - 35, "", { fontSize: "14px", color: "#6b5344", align: "center", wordWrap: { width: 300 } })
+      .text(WORLD.width / 2, WORLD.height / 2 - 35, "", {
+        fontSize: "14px",
+        color: "#6b5344",
+        align: "center",
+        wordWrap: { width: 300 },
+      })
       .setOrigin(0.5)
       .setName("endMsg");
     const feedbackPrompt = this.add
@@ -540,23 +695,27 @@ export class PicnicScene extends Phaser.Scene {
     return container;
   }
 
+  private finalizeRun(): void {
+    if (!this.state?.ended || this.earnedThisRun > 0) return;
+    this.earnedThisRun = crustCredits(this.state);
+    addCredits(this.earnedThisRun);
+  }
+
   private showEndOverlay(): void {
     if (!this.state?.ended) return;
     const title = this.endOverlay.getByName("endTitle") as Phaser.GameObjects.Text;
     const msg = this.endOverlay.getByName("endMsg") as Phaser.GameObjects.Text;
-    const credits = crustCredits(this.state);
-    const total = addCredits(credits);
-
-    const prog = loadProgression();
-    const hintText = upgradeUnlockHint(prog);
+    const earned = this.earnedThisRun || crustCredits(this.state);
+    const total = loadProgression().crustCredits;
+    const hintText = upgradeUnlockHint(loadProgression());
     const hint = hintText ? `\n${hintText}` : "";
 
     if (this.state.ended === "jar_empty") {
       title.setText("Jar empty!");
-      msg.setText(`Spoons: ${Math.floor(this.state.spoons)}\nCrust Credits: ${credits}\nTotal: ${total}${hint}`);
+      msg.setText(`Spoons: ${Math.floor(this.state.spoons)}\n+${earned} Crust Credits (total: ${total})${hint}`);
     } else {
       title.setText("Stuck Shut!");
-      msg.setText(`Too much peanut butter.\nCrust Credits: ${credits}\nTotal: ${total}${hint}`);
+      msg.setText(`Too much peanut butter.\n+${earned} Crust Credits (total: ${total})${hint}`);
     }
     this.endOverlay.setVisible(true);
   }
@@ -567,6 +726,17 @@ export class PicnicScene extends Phaser.Scene {
     openPlaytestFeedbackDialog(createPlaytestRunSummary(this.state));
   }
 
+  private beginRun(): void {
+    this.state = createRun(this.selectedMod);
+    this.earnedThisRun = 0;
+    this.wasFrenzy = false;
+    this.overlay.setVisible(false);
+    this.eventOverlay.setVisible(false);
+    this.updateHud();
+    this.updateJarFill();
+    startMusic();
+  }
+
   private restartRun(): void {
     playClick();
     for (const [, sprite] of this.blobSprites) sprite.destroy();
@@ -575,15 +745,13 @@ export class PicnicScene extends Phaser.Scene {
     this.antSprites.clear();
     this.floatTexts.forEach((t) => t.destroy());
     this.floatTexts = [];
-    this.state = createRun(this.selectedMod);
-    this.wasFrenzy = false;
     this.endOverlay.setVisible(false);
-    (window as any).__MEP_QA__ = { flags: () => this.qaFlags(), click: (k: string) => { if (k === 'start-run') { this.qaClickStart(); return 'ok'; } if (k.startsWith('chomp-man-')) { this.qaClickMan(parseInt(k.split('-').pop() || '0')); return 'ok'; } if (k === 'retry') { this.qaClickRetry(); return 'ok'; } return 'error'; } };
-    this.updateHud();
-    startMusic();
+    this.overlay.setVisible(true);
+    this.state = null;
+    stopMusic();
+    this.installQaBridge();
   }
 
-  // QA Bridge
   public qaFlags() {
     return {
       running: this.state?.running ?? false,
@@ -592,26 +760,21 @@ export class PicnicScene extends Phaser.Scene {
       ended: this.state?.ended ?? null,
       overlayVisible: this.overlay.visible,
       endOverlayVisible: this.endOverlay.visible,
-      juicePass: true, // squash-and-stretch + float-text + border implemented
+      eventPending: this.state?.eventPending ?? false,
+      activeEvent: this.state?.activeEvent ?? null,
+      juicePass: true,
       antInvasion: (this.state?.ants.length ?? 0) > 0,
     };
   }
 
   public qaClickStart(): void {
     if (this.overlay.visible) {
-      // Find start button in container or just trigger the logic
-      this.state = createRun(this.selectedMod);
-      this.wasFrenzy = false;
-      this.overlay.setVisible(false);
-      this.updateHud();
-      startMusic();
+      this.beginRun();
     }
   }
 
   public qaClickMan(index: number): void {
     if (this.state?.running && index >= 0 && index < MAN_POSITIONS.length) {
-      // We don't have easy access to head/mouth objects here without storing them,
-      // but we can trigger the sim chomp.
       const manId = MAN_POSITIONS[index].id;
       const result = chomp(this.state, manId, this.time.now);
       if (result.hit && result.value > 0) {
@@ -629,9 +792,14 @@ export class PicnicScene extends Phaser.Scene {
       this.wasFrenzy = this.state.frenzy;
 
       this.syncBlobs();
+      this.syncAnts();
       this.updateHud();
-      if (result.ended) this.endRunAudio(result.ended);
-      if (result.ended) this.showEndOverlay();
+      this.updateJarFill();
+      if (result.ended) {
+        this.endRunAudio(result.ended);
+        this.finalizeRun();
+        this.showEndOverlay();
+      }
     }
   }
 

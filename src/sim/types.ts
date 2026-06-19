@@ -1,5 +1,6 @@
 export type ModifierId = "double" | "napkins" | "crust";
 export type ManId = "Carl" | "Dave" | "Ben" | "Ed";
+export type TableEventId = "ants" | "mom_share";
 
 export type RunEndReason = "jar_empty" | "stuck_shut" | null;
 
@@ -45,6 +46,13 @@ export interface RunState {
   spawnTimer: number;
   nextBlobId: number;
   nextAntId: number;
+  /** Mid-run table event has been offered (at ~50% jar). */
+  eventOffered: boolean;
+  /** Player must pick an event before the run continues. */
+  eventPending: boolean;
+  activeEvent: TableEventId | null;
+  eventTimer: number;
+  lastChompedMan: ManId | null;
 }
 
 export interface UpgradeState {
@@ -66,6 +74,7 @@ export interface ChompResult {
 export const MAN_IDS: ManId[] = ["Carl", "Dave", "Ben", "Ed"];
 
 export const CHOMP_REACH = 140;
+export const STUCK_SHUT_MISSES = 5;
 
 export const WORLD = {
   width: 800,
