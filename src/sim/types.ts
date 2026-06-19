@@ -1,4 +1,5 @@
 export type ModifierId = "double" | "napkins" | "crust";
+export type LocationId = "park" | "beach" | "food_truck" | "backyard";
 export type ManId = "Carl" | "Dave" | "Ben" | "Ed";
 export type TableEventId = "ants" | "mom_share";
 
@@ -38,6 +39,7 @@ export interface RunState {
   frenzy: boolean;
   frenzyTimer: number;
   modifier: ModifierId;
+  location: LocationId;
   running: boolean;
   ended: RunEndReason;
   blobs: Blob[];
@@ -53,6 +55,8 @@ export interface RunState {
   activeEvent: TableEventId | null;
   eventTimer: number;
   lastChompedMan: ManId | null;
+  /** Tutorial practice run — slower spawns, no lose condition */
+  tutorialMode: boolean;
 }
 
 export interface UpgradeState {

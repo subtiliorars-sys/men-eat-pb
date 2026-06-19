@@ -1,6 +1,11 @@
 import { tableEventDef } from "./events.js";
 import { modifierDef } from "./modifiers.js";
 import { loadProgression } from "./progression.js";
+import {
+  locationBlobSpeedMult,
+  locationCrunchyBonus,
+  locationDef,
+} from "./locations.js";
 import type { Rng } from "./rng.js";
 import {
   CHOMP_REACH,
@@ -9,6 +14,7 @@ import {
   WORLD,
   type Blob,
   type ChompResult,
+  type LocationId,
   type ManId,
   type ModifierId,
   type RunEndReason,
@@ -22,8 +28,19 @@ const FRENZY_DURATION = 10;
 const STICKY_MS = 3000;
 const MAX_BLOBS = 30;
 const EVENT_JAR_THRESHOLD = 50;
+/** Gentle drift — fast blobs looked like a blur on screen */
+const BLOB_SPEED_X = 28;
+const BLOB_SPEED_Y = 22;
 
-export function createRun(modifier: ModifierId): RunState {
+export interface CreateRunOptions {
+  tutorialMode?: boolean;
+}
+
+export function createRun(
+  modifier: ModifierId,
+  location: LocationId = "park",
+  options: CreateRunOptions = {},
+): RunState {
   const mod = modifierDef(modifier);
   const prog = loadProgression();
   const jarMax = Math.floor(100 * mod.jarMult * (1 + prog.upgrades.deeperJar * 0.25));
@@ -36,6 +53,7 @@ export function createRun(modifier: ModifierId): RunState {
     frenzy: false,
     frenzyTimer: 0,
     modifier,
+    location,
     running: true,
     ended: null,
     blobs: [],
@@ -49,6 +67,7 @@ export function createRun(modifier: ModifierId): RunState {
     activeEvent: null,
     eventTimer: 0,
     lastChompedMan: null,
+    tutorialMode: options.tutorialMode ?? false,
   };
 }
 
@@ -106,20 +125,23 @@ export function spawnBlob(state: RunState, rng: Rng): Blob {
     state.blobs.shift();
   }
   const mod = modifierDef(state.modifier);
-  const crunchy = rng.next() < mod.crunchyChance;
+  const loc = locationDef(state.location);
+  const crunchy =
+    rng.next() < mod.crunchyChance + locationCrunchyBonus(state.location);
   const size = crunchy ? 22 + rng.next() * 12 : 28 + rng.next() * 16;
   const x =
-    WORLD.width * (WORLD.spawnXMin + rng.next() * (WORLD.spawnXMax - WORLD.spawnXMin));
+    WORLD.width * (loc.spawnXMin + rng.next() * (loc.spawnXMax - loc.spawnXMin));
   const y =
-    WORLD.height * (WORLD.spawnYMin + rng.next() * (WORLD.spawnYMax - WORLD.spawnYMin));
+    WORLD.height * (loc.spawnYMin + rng.next() * (loc.spawnYMax - loc.spawnYMin));
+  const speedMult = locationBlobSpeedMult(state.location);
   const blob: Blob = {
     id: state.nextBlobId++,
     x,
     y,
     size,
     crunchy,
-    vx: (rng.next() - 0.5) * 80,
-    vy: (rng.next() - 0.5) * 60,
+    vx: (rng.next() - 0.5) * BLOB_SPEED_X * 2 * speedMult,
+    vy: (rng.next() - 0.5) * BLOB_SPEED_Y * 2 * speedMult,
   };
   state.blobs.push(blob);
   return blob;
@@ -142,11 +164,13 @@ export function chomp(
   const blob = nearestBlob(state, pos.x, pos.y);
   if (!blob) {
     state.chain = 0;
-    state.missStreak++;
-    state.stickyUntil = nowMs + STICKY_MS * modifierDef(state.modifier).stickyMult;
-    if (state.missStreak >= STUCK_SHUT_MISSES) {
-      endRun(state, "stuck_shut");
-      return { hit: false, value: 0, ended: "stuck_shut" };
+    if (!state.tutorialMode) {
+      state.missStreak++;
+      state.stickyUntil = nowMs + STICKY_MS * modifierDef(state.modifier).stickyMult;
+      if (state.missStreak >= STUCK_SHUT_MISSES) {
+        endRun(state, "stuck_shut");
+        return { hit: false, value: 0, ended: "stuck_shut" };
+      }
     }
     return { hit: false, value: 0, ended: null };
   }
@@ -193,7 +217,7 @@ export function clickAnt(state: RunState, antId: number): boolean {
 }
 
 function maybeOfferEvent(state: RunState, jarLeftBefore: number): void {
-  if (state.eventOffered || state.eventPending) return;
+  if (state.tutorialMode || state.eventOffered || state.eventPending) return;
   const prevPct = (jarLeftBefore / state.jarMax) * 100;
   const pct = jarPercent(state);
   if (prevPct > EVENT_JAR_THRESHOLD && pct <= EVENT_JAR_THRESHOLD) {
@@ -211,6 +235,28 @@ export function startTableEvent(state: RunState, eventId: TableEventId): void {
   state.eventTimer = def.duration;
   state.running = true;
   state.lastChompedMan = null;
+}
+
+/** Seed a few slow blobs for the interactive tutorial */
+export function seedTutorialBlobs(state: RunState): void {
+  const cx = WORLD.width * 0.5;
+  const cy = WORLD.height * 0.47;
+  const spots = [
+    { x: cx - 40, y: cy - 15 },
+    { x: cx + 30, y: cy + 10 },
+    { x: cx, y: cy + 25 },
+  ];
+  for (const spot of spots) {
+    state.blobs.push({
+      id: state.nextBlobId++,
+      x: spot.x,
+      y: spot.y,
+      size: 32,
+      crunchy: false,
+      vx: (Math.random() - 0.5) * 8,
+      vy: (Math.random() - 0.5) * 6,
+    });
+  }
 }
 
 export function tick(state: RunState, dt: number, nowMs: number, rng: Rng): void {
@@ -238,10 +284,11 @@ export function tick(state: RunState, dt: number, nowMs: number, rng: Rng): void
   }
 
   const sticky = isSticky(state, nowMs);
-  const delay =
+  let delay =
     (state.frenzy ? BASE_SPAWN_DELAY * 0.5 : BASE_SPAWN_DELAY) *
     (sticky ? 1.4 : 1) *
     eventSpawnMult(state);
+  if (state.tutorialMode) delay *= 2.2;
   state.spawnTimer += dt;
   if (state.spawnTimer >= delay) {
     state.spawnTimer = 0;
@@ -273,7 +320,7 @@ export function tick(state: RunState, dt: number, nowMs: number, rng: Rng): void
 
   maybeOfferEvent(state, jarLeftBefore);
 
-  if (state.jarLeft <= 0 && state.running) {
+  if (state.jarLeft <= 0 && state.running && !state.tutorialMode) {
     endRun(state, "jar_empty");
   }
 }
