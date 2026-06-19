@@ -7,20 +7,21 @@ Pending waves for the fleet worker. One PR per wave; run `npm run verify` before
 - [x] PicnicScene: four men, blobs, modifiers, Frenzy, run end
 - [x] README + repo scaffold
 
-## MEP-W2 — Juice pass
-- [ ] Chomp squash animation polish
-- [ ] Web Audio chomp + Frenzy pitch (optional mute)
-- [ ] Miss splat visual on table
-- [ ] Screen border pulse during Frenzy
+## MEP-W2 — Juice pass (DONE)
+- [x] Chomp squash animation polish
+- [x] Web Audio chomp + Frenzy pitch (optional mute)
+- [x] Miss splat visual on table
+- [x] Screen border pulse during Frenzy
+- [x] Visual jar fill depletion + miss/sticky HUD
 
-## MEP-W3 — Meta stub
-- [ ] Persist Crust Credits (localStorage)
-- [ ] Upgrade shop: Deeper Jar I, Golden Spoon
-- [ ] Run summary shows unlock hints
+## MEP-W3 — Meta stub (DONE)
+- [x] Persist Crust Credits (localStorage)
+- [x] Upgrade shop: Deeper Jar I, Golden Spoon
+- [x] Run summary shows unlock hints
 
-## MEP-W4 — Table Events
-- [ ] One mid-run event (*Ant Invasion* or *Mom Says Share*)
-- [ ] Event picker at 50% jar depletion
+## MEP-W4 — Table Events (DONE)
+- [x] Two mid-run events (*Ant Invasion*, *Mom Says Share*)
+- [x] Event picker at 50% jar depletion
 
 ## MEP-W5 — QA gate
 - [ ] `docs/QA_BROWSER.md` + dev QA bridge (DrivingMeNuts pattern)

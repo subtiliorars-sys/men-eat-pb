@@ -1,8 +1,11 @@
+import { jarUpgradeMult, spoonUpgradeMult } from "../meta/progress.js";
+import { tableEventDef } from "./events.js";
 import { modifierDef } from "./modifiers.js";
 import type { Rng } from "./rng.js";
 import {
   CHOMP_REACH,
   MAN_POSITIONS,
+  STUCK_SHUT_MISSES,
   WORLD,
   type Blob,
   type ChompResult,
@@ -10,18 +13,19 @@ import {
   type ModifierId,
   type RunEndReason,
   type RunState,
+  type TableEventId,
 } from "./types.js";
 
 const BASE_SPAWN_DELAY = 1.2;
 const DIGESTION_RATE = 0.3;
 const FRENZY_DURATION = 10;
-const STUCK_SHUT_MISSES = 5;
 const STICKY_MS = 3000;
 const MAX_BLOBS = 30;
+const EVENT_JAR_THRESHOLD = 50;
 
 export function createRun(modifier: ModifierId): RunState {
   const mod = modifierDef(modifier);
-  const jarMax = Math.floor(100 * mod.jarMult);
+  const jarMax = Math.floor(100 * mod.jarMult * jarUpgradeMult());
   return {
     spoons: 0,
     jarMax,
@@ -37,6 +41,11 @@ export function createRun(modifier: ModifierId): RunState {
     stickyUntil: 0,
     spawnTimer: 0,
     nextBlobId: 1,
+    eventOffered: false,
+    eventPending: false,
+    activeEvent: null,
+    eventTimer: 0,
+    lastChompedMan: null,
   };
 }
 
@@ -49,10 +58,23 @@ function endRun(state: RunState, reason: RunEndReason): void {
   state.ended = reason;
 }
 
-function blobValue(blob: Blob, modifier: ModifierId, frenzy: boolean): number {
-  const mod = modifierDef(modifier);
-  let val = (blob.crunchy ? 3 : 1) * mod.valueMult * mod.spoonMult;
-  if (frenzy) val *= 1.5;
+function eventValueMult(state: RunState, manId: ManId): number {
+  if (state.activeEvent !== "mom_share") return 1;
+  if (state.lastChompedMan === null || state.lastChompedMan !== manId) return 1.5;
+  return 0.5;
+}
+
+function eventSpawnMult(state: RunState): number {
+  if (state.activeEvent === "ants") return 0.5;
+  return 1;
+}
+
+function blobValue(blob: Blob, state: RunState, manId: ManId): number {
+  const mod = modifierDef(state.modifier);
+  let val =
+    (blob.crunchy ? 3 : 1) * mod.valueMult * mod.spoonMult * spoonUpgradeMult() * eventValueMult(state, manId);
+  if (state.frenzy) val *= 1.5;
+  if (state.activeEvent === "ants") val *= 1.5;
   return val;
 }
 
@@ -103,7 +125,7 @@ export function chomp(
   manId: ManId,
   nowMs: number,
 ): ChompResult {
-  if (!state.running) {
+  if (!state.running || state.eventPending) {
     return { hit: false, value: 0, ended: state.ended };
   }
 
@@ -126,10 +148,11 @@ export function chomp(
 
   state.missStreak = 0;
   state.chain++;
-  const val = blobValue(blob, state.modifier, state.frenzy);
+  const val = blobValue(blob, state, manId);
   state.spoons += val;
   state.jarLeft = Math.max(0, state.jarLeft - val * 0.8);
   state.blobs = state.blobs.filter((b) => b.id !== blob.id);
+  state.lastChompedMan = manId;
 
   const mod = modifierDef(state.modifier);
   if (state.chain >= mod.frenzyThreshold && !state.frenzy) {
@@ -145,11 +168,42 @@ export function chomp(
   return { hit: true, value: val, ended: null };
 }
 
+function maybeOfferEvent(state: RunState, jarLeftBefore: number): void {
+  if (state.eventOffered || state.eventPending) return;
+  const prevPct = (jarLeftBefore / state.jarMax) * 100;
+  const pct = jarPercent(state);
+  if (prevPct > EVENT_JAR_THRESHOLD && pct <= EVENT_JAR_THRESHOLD) {
+    state.eventOffered = true;
+    state.eventPending = true;
+    state.running = false;
+  }
+}
+
+export function startTableEvent(state: RunState, eventId: TableEventId): void {
+  if (!state.eventPending) return;
+  const def = tableEventDef(eventId);
+  state.eventPending = false;
+  state.activeEvent = eventId;
+  state.eventTimer = def.duration;
+  state.running = true;
+  state.lastChompedMan = null;
+}
+
 export function tick(state: RunState, dt: number, nowMs: number, rng: Rng): void {
   if (!state.running) return;
 
+  const jarLeftBefore = state.jarLeft;
   state.spoons += DIGESTION_RATE * dt;
   state.jarLeft = Math.max(0, state.jarLeft - DIGESTION_RATE * dt * 0.3);
+
+  if (state.activeEvent) {
+    state.eventTimer -= dt;
+    if (state.eventTimer <= 0) {
+      state.activeEvent = null;
+      state.eventTimer = 0;
+      state.lastChompedMan = null;
+    }
+  }
 
   if (state.frenzy) {
     state.frenzyTimer -= dt;
@@ -159,8 +213,11 @@ export function tick(state: RunState, dt: number, nowMs: number, rng: Rng): void
     }
   }
 
-  const sticky = nowMs < state.stickyUntil;
-  const delay = (state.frenzy ? BASE_SPAWN_DELAY * 0.5 : BASE_SPAWN_DELAY) * (sticky ? 1.4 : 1);
+  const sticky = isSticky(state, nowMs);
+  const delay =
+    (state.frenzy ? BASE_SPAWN_DELAY * 0.5 : BASE_SPAWN_DELAY) *
+    (sticky ? 1.4 : 1) *
+    eventSpawnMult(state);
   state.spawnTimer += dt;
   if (state.spawnTimer >= delay) {
     state.spawnTimer = 0;
@@ -173,6 +230,8 @@ export function tick(state: RunState, dt: number, nowMs: number, rng: Rng): void
     if (b.x < WORLD.blobBounceXMin || b.x > WORLD.blobBounceXMax) b.vx *= -1;
     if (b.y < WORLD.blobBounceYMin || b.y > WORLD.blobBounceYMax) b.vy *= -1;
   }
+
+  maybeOfferEvent(state, jarLeftBefore);
 
   if (state.jarLeft <= 0 && state.running) {
     endRun(state, "jar_empty");
@@ -189,4 +248,20 @@ export function frenzyThreshold(state: RunState): number {
 
 export function jarPercent(state: RunState): number {
   return Math.max(0, (state.jarLeft / state.jarMax) * 100);
+}
+
+export function isSticky(state: RunState, nowMs: number): boolean {
+  return nowMs < state.stickyUntil;
+}
+
+export function stickyRemaining(state: RunState, nowMs: number): number {
+  return isSticky(state, nowMs) ? Math.ceil((state.stickyUntil - nowMs) / 1000) : 0;
+}
+
+export function missesUntilStuck(state: RunState): number {
+  return Math.max(0, STUCK_SHUT_MISSES - state.missStreak);
+}
+
+export function eventRemaining(state: RunState): number {
+  return state.activeEvent ? Math.ceil(state.eventTimer) : 0;
 }
