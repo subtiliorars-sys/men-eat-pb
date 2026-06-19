@@ -3,9 +3,14 @@ import {
   chomp,
   createRun,
   crustCredits,
+  eventRemaining,
   frenzyThreshold,
+  isSticky,
+  jarPercent,
+  missesUntilStuck,
   nearestBlob,
   spawnBlob,
+  startTableEvent,
   tick,
 } from "./engine.js";
 import { createSeededRng } from "./rng.js";
@@ -16,6 +21,12 @@ describe("createRun", () => {
     const run = createRun("crust");
     expect(run.jarMax).toBe(70);
     expect(run.jarLeft).toBe(70);
+  });
+
+  it("starts with no active event", () => {
+    const run = createRun("double");
+    expect(run.eventPending).toBe(false);
+    expect(run.activeEvent).toBeNull();
   });
 });
 
@@ -133,5 +144,58 @@ describe("spawnBlob cap", () => {
     const blobB = spawnBlob(b, rngB);
     expect(blobA.crunchy).toBe(blobB.crunchy);
     expect(blobA.x).toBeCloseTo(blobB.x, 5);
+  });
+});
+
+describe("table events", () => {
+  it("offers event when crossing 50% jar depletion", () => {
+    const run = createRun("double");
+    run.jarLeft = run.jarMax * 0.501;
+    tick(run, 2.5, 0, createSeededRng(1));
+    expect(run.eventPending).toBe(true);
+    expect(run.running).toBe(false);
+  });
+
+  it("starts ant invasion with faster spawns", () => {
+    const run = createRun("double");
+    run.eventPending = true;
+    startTableEvent(run, "ants");
+    expect(run.running).toBe(true);
+    expect(run.activeEvent).toBe("ants");
+    expect(eventRemaining(run)).toBeGreaterThan(0);
+  });
+
+  it("mom share rewards alternating men", () => {
+    const run = createRun("double");
+    run.eventPending = true;
+    startTableEvent(run, "mom_share");
+
+    run.blobs.push({ id: 1, x: 280, y: 250, size: 20, crunchy: false, vx: 0, vy: 0 });
+    const first = chomp(run, "Carl", 0);
+    expect(first.value).toBe(1.5);
+
+    run.blobs.push({ id: 2, x: 520, y: 250, size: 20, crunchy: false, vx: 0, vy: 0 });
+    const alt = chomp(run, "Dave", 0);
+    expect(alt.value).toBe(1.5);
+
+    run.blobs.push({ id: 3, x: 520, y: 250, size: 20, crunchy: false, vx: 0, vy: 0 });
+    const repeat = chomp(run, "Dave", 0);
+    expect(repeat.value).toBe(0.5);
+  });
+});
+
+describe("sticky and misses", () => {
+  it("tracks misses until stuck", () => {
+    const run = createRun("double");
+    expect(missesUntilStuck(run)).toBe(5);
+    chomp(run, "Carl", 0);
+    expect(missesUntilStuck(run)).toBe(4);
+    expect(isSticky(run, 100)).toBe(true);
+  });
+
+  it("reports jar percent", () => {
+    const run = createRun("double");
+    run.jarLeft = 50;
+    expect(jarPercent(run)).toBe(50);
   });
 });
