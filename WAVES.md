@@ -27,7 +27,7 @@ Pending waves for the fleet worker. One PR per wave; run `npm run verify` before
 - [x] Community playtest feedback intake + volunteer review workflow
 - [x] Dynamic feedback API contract + separate volunteer admin scaffold
 - [x] Optional Worker/D1 feedback backend scaffold
-- [ ] game-provost tutorial audit
+- [x] game-provost tutorial audit (first-run tutorial + replay from start screen)
 
 ## Ethics
 

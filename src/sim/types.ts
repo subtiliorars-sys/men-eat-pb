@@ -1,4 +1,5 @@
 export type ModifierId = "double" | "napkins" | "crust";
+export type LocationId = "park" | "beach" | "food_truck" | "backyard";
 export type ManId = "Carl" | "Dave" | "Ben" | "Ed";
 
 export type RunEndReason = "jar_empty" | "stuck_shut" | null;
@@ -28,12 +29,15 @@ export interface RunState {
   frenzy: boolean;
   frenzyTimer: number;
   modifier: ModifierId;
+  location: LocationId;
   running: boolean;
   ended: RunEndReason;
   blobs: Blob[];
   stickyUntil: number;
   spawnTimer: number;
   nextBlobId: number;
+  /** Tutorial practice run — slower spawns, no lose condition */
+  tutorialMode: boolean;
 }
 
 export interface ChompResult {

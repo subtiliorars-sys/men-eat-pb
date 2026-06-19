@@ -15,10 +15,11 @@ npm run verify   # tsc + tests + build
 
 ## Controls
 
-1. Pick a **Lunch modifier** on the start overlay.
-2. Tap **Carl, Dave, Ben, or Ed** to chomp the nearest blob.
-3. Chain chomps → **Frenzy**. Five misses → **Stuck Shut**. Empty jar → win.
-4. After a run, click **Send feedback** to open the community playtest intake with the run summary attached.
+1. **First visit:** follow the step-by-step tutorial (or tap *Replay tutorial* on the start screen).
+2. Pick a **location** (Park, Beach, Food Truck Row, Backyard BBQ) and a **lunch modifier**.
+3. Tap **Carl, Dave, Ben, or Ed** to chomp the nearest blob.
+4. Chain chomps → **Frenzy**. Five misses → **Stuck Shut**. Empty jar → win.
+5. After a run, click **Send feedback** to open the community playtest intake with the run summary attached.
 
 ## Community playtesting
 
