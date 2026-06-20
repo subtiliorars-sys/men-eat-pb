@@ -1,4 +1,15 @@
 import Phaser from "phaser";
+import {
+  isMuted,
+  playChomp,
+  playClick,
+  playFrenzy,
+  playLose,
+  playMiss,
+  playWin,
+  toggleMuted,
+} from "../audio/sfx.js";
+import { setMusicFrenzy, startMusic, stopMusic } from "../audio/music.js";
 import { openPlaytestFeedbackDialog } from "../feedback/feedbackDialog.js";
 import { createPlaytestRunSummary } from "../feedback/playtestFeedback.js";
 import {
@@ -42,6 +53,8 @@ export class PicnicScene extends Phaser.Scene {
   private endOverlay!: Phaser.GameObjects.Container;
   private selectedMod: ModifierId = "double";
   private floatTexts: Phaser.GameObjects.Text[] = [];
+  private wasFrenzy = false;
+  private muteBtn!: Phaser.GameObjects.Text;
 
   constructor() {
     super("PicnicScene");
@@ -62,9 +75,39 @@ export class PicnicScene extends Phaser.Scene {
       })
       .setDepth(20);
 
+    this.createMuteButton();
+
     this.overlay = this.createStartOverlay();
     this.endOverlay = this.createEndOverlay();
     this.endOverlay.setVisible(false);
+  }
+
+  private createMuteButton(): void {
+    this.muteBtn = this.add
+      .text(WORLD.width - 16, 12, this.muteLabel(), {
+        fontFamily: "system-ui, sans-serif",
+        fontSize: "16px",
+        color: "#5c3d1e",
+        backgroundColor: "#fff8dc",
+        padding: { x: 8, y: 6 },
+      })
+      .setOrigin(1, 0)
+      .setDepth(70)
+      .setInteractive({ useHandCursor: true });
+    this.muteBtn.on("pointerdown", () => {
+      toggleMuted();
+      if (isMuted()) {
+        stopMusic();
+      } else if (this.state?.running) {
+        startMusic();
+        setMusicFrenzy(this.state.frenzy);
+      }
+      this.muteBtn.setText(this.muteLabel());
+    });
+  }
+
+  private muteLabel(): string {
+    return isMuted() ? "🔇 Sound off" : "🔊 Sound on";
   }
 
   update(_time: number, delta: number): void {
@@ -72,10 +115,17 @@ export class PicnicScene extends Phaser.Scene {
 
     const dt = Math.min(delta / 1000, 0.05);
     tick(this.state, dt, this.time.now, defaultRng);
+
+    if (!this.state.frenzy && this.wasFrenzy) {
+      setMusicFrenzy(false);
+      this.wasFrenzy = false;
+    }
+
     this.syncBlobs();
     this.updateHud();
 
     if (this.state.ended) {
+      this.endRunAudio(this.state.ended);
       this.showEndOverlay();
     }
   }
@@ -137,10 +187,27 @@ export class PicnicScene extends Phaser.Scene {
     if (result.hit && result.value > 0) {
       const pos = MAN_POSITIONS.find((m) => m.id === manId)!;
       this.spawnFloatText(pos.x, pos.y - 20, `+${result.value % 1 ? result.value.toFixed(1) : result.value}`);
+      playChomp(this.state.chain, result.value >= 3);
+    } else if (!result.ended) {
+      playMiss();
     }
+
+    if (this.state.frenzy && !this.wasFrenzy) {
+      playFrenzy();
+      setMusicFrenzy(true);
+    }
+    this.wasFrenzy = this.state.frenzy;
+
     this.syncBlobs();
     this.updateHud();
+    if (result.ended) this.endRunAudio(result.ended);
     if (result.ended) this.showEndOverlay();
+  }
+
+  private endRunAudio(reason: NonNullable<RunState["ended"]>): void {
+    stopMusic();
+    if (reason === "jar_empty") playWin();
+    else playLose();
   }
 
   private syncBlobs(): void {
@@ -233,6 +300,7 @@ export class PicnicScene extends Phaser.Scene {
         .setOrigin(0.5)
         .setInteractive({ useHandCursor: true });
       btn.on("pointerdown", () => {
+        playClick();
         this.selectedMod = id;
         modButtons.forEach((b, j) => {
           const mid = mods[j];
@@ -255,9 +323,12 @@ export class PicnicScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true });
 
     startBtn.on("pointerdown", () => {
+      playClick();
       this.state = createRun(this.selectedMod);
+      this.wasFrenzy = false;
       this.overlay.setVisible(false);
       this.updateHud();
+      startMusic();
     });
 
     const container = this.add.container(0, 0, [bg, panel, title, sub, ...modButtons, startBtn]);
@@ -337,17 +408,20 @@ export class PicnicScene extends Phaser.Scene {
 
   private openPlaytestFeedback(): void {
     if (!this.state?.ended) return;
-
+    playClick();
     openPlaytestFeedbackDialog(createPlaytestRunSummary(this.state));
   }
 
   private restartRun(): void {
+    playClick();
     for (const [, sprite] of this.blobSprites) sprite.destroy();
     this.blobSprites.clear();
     this.floatTexts.forEach((t) => t.destroy());
     this.floatTexts = [];
     this.state = createRun(this.selectedMod);
+    this.wasFrenzy = false;
     this.endOverlay.setVisible(false);
     this.updateHud();
+    startMusic();
   }
 }
