@@ -172,7 +172,8 @@ export class PicnicScene extends Phaser.Scene {
 
     this.tweens.add({
       targets: head,
-      scaleY: { from: 1, to: 1.12 },
+      scaleY: { from: 1, to: 1.15 },
+      scaleX: { from: 1, to: 0.92 },
       yoyo: true,
       duration: 80,
       ease: "Quad.easeOut",
