@@ -1,4 +1,5 @@
 import { modifierDef } from "./modifiers.js";
+import { loadProgression } from "./progression.js";
 import type { Rng } from "./rng.js";
 import {
   CHOMP_REACH,
@@ -21,7 +22,8 @@ const MAX_BLOBS = 30;
 
 export function createRun(modifier: ModifierId): RunState {
   const mod = modifierDef(modifier);
-  const jarMax = Math.floor(100 * mod.jarMult);
+  const prog = loadProgression();
+  const jarMax = Math.floor(100 * mod.jarMult * (1 + prog.upgrades.deeperJar * 0.25));
   return {
     spoons: 0,
     jarMax,
@@ -51,7 +53,9 @@ function endRun(state: RunState, reason: RunEndReason): void {
 
 function blobValue(blob: Blob, modifier: ModifierId, frenzy: boolean): number {
   const mod = modifierDef(modifier);
+  const prog = loadProgression();
   let val = (blob.crunchy ? 3 : 1) * mod.valueMult * mod.spoonMult;
+  if (prog.upgrades.goldenSpoon) val *= 1.2;
   if (frenzy) val *= 1.5;
   return val;
 }

@@ -21,6 +21,7 @@ import {
   jarPercent,
   tick,
 } from "../sim/engine.js";
+import { addCredits, buyUpgrade, loadProgression } from "../sim/progression.js";
 import { MODIFIERS } from "../sim/modifiers.js";
 import { defaultRng } from "../sim/rng.js";
 import {
@@ -311,8 +312,64 @@ export class PicnicScene extends Phaser.Scene {
       modButtons.push(btn);
     });
 
+    const prog = loadProgression();
+    const upgradeTitle = this.add
+      .text(WORLD.width / 2, WORLD.height / 2 + 45, `Upgrades (Credits: ${prog.totalCredits})`, {
+        fontSize: "13px",
+        fontStyle: "bold",
+        color: "#5c3d1e",
+      })
+      .setOrigin(0.5);
+
+    const jarBtn = this.add
+      .text(WORLD.width / 2 - 75, WORLD.height / 2 + 75, `Deeper Jar (Lvl ${prog.upgrades.deeperJar})\n[20c]`, {
+        fontSize: "11px",
+        backgroundColor: "#f5e6cc",
+        color: "#5c3d1e",
+        align: "center",
+        padding: { x: 5, y: 5 },
+      })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true });
+
+    const spoonBtn = this.add
+      .text(
+        WORLD.width / 2 + 75,
+        WORLD.height / 2 + 75,
+        `Golden Spoon\n${prog.upgrades.goldenSpoon ? "[OWNED]" : "[50c]"}`,
+        {
+          fontSize: "11px",
+          backgroundColor: prog.upgrades.goldenSpoon ? "#d4a017" : "#f5e6cc",
+          color: prog.upgrades.goldenSpoon ? "#ffffff" : "#5c3d1e",
+          align: "center",
+          padding: { x: 5, y: 5 },
+        },
+      )
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true });
+
+    jarBtn.on("pointerdown", () => {
+      if (buyUpgrade("deeperJar")) {
+        playClick();
+        const p = loadProgression();
+        upgradeTitle.setText(`Upgrades (Credits: ${p.totalCredits})`);
+        jarBtn.setText(`Deeper Jar (Lvl ${p.upgrades.deeperJar})\n[20c]`);
+      }
+    });
+
+    spoonBtn.on("pointerdown", () => {
+      if (buyUpgrade("goldenSpoon")) {
+        playClick();
+        const p = loadProgression();
+        upgradeTitle.setText(`Upgrades (Credits: ${p.totalCredits})`);
+        spoonBtn.setText(`Golden Spoon\n[OWNED]`);
+        spoonBtn.setBackgroundColor("#d4a017");
+        spoonBtn.setColor("#ffffff");
+      }
+    });
+
     const startBtn = this.add
-      .text(WORLD.width / 2, WORLD.height / 2 + 70, "Open the jar", {
+      .text(WORLD.width / 2, WORLD.height / 2 + 125, "Open the jar", {
         fontSize: "18px",
         fontStyle: "bold",
         backgroundColor: "#d4a017",
@@ -331,7 +388,17 @@ export class PicnicScene extends Phaser.Scene {
       startMusic();
     });
 
-    const container = this.add.container(0, 0, [bg, panel, title, sub, ...modButtons, startBtn]);
+    const container = this.add.container(0, 0, [
+      bg,
+      panel,
+      title,
+      sub,
+      ...modButtons,
+      upgradeTitle,
+      jarBtn,
+      spoonBtn,
+      startBtn,
+    ]);
     container.setDepth(50);
     return container;
   }
@@ -395,13 +462,19 @@ export class PicnicScene extends Phaser.Scene {
     const title = this.endOverlay.getByName("endTitle") as Phaser.GameObjects.Text;
     const msg = this.endOverlay.getByName("endMsg") as Phaser.GameObjects.Text;
     const credits = crustCredits(this.state);
+    const total = addCredits(credits);
+
+    const prog = loadProgression();
+    let hint = "";
+    if (prog.totalCredits < 20) hint = `\n(Hint: 20 credits for Deeper Jar)`;
+    else if (!prog.upgrades.goldenSpoon && prog.totalCredits < 50) hint = `\n(Hint: 50 credits for Golden Spoon)`;
 
     if (this.state.ended === "jar_empty") {
       title.setText("Jar empty!");
-      msg.setText(`Spoons: ${Math.floor(this.state.spoons)}\nCrust Credits: ${credits}`);
+      msg.setText(`Spoons: ${Math.floor(this.state.spoons)}\nCrust Credits: ${credits}\nTotal: ${total}${hint}`);
     } else {
       title.setText("Stuck Shut!");
-      msg.setText(`Too much peanut butter.\nCrust Credits: ${credits}`);
+      msg.setText(`Too much peanut butter.\nCrust Credits: ${credits}\nTotal: ${total}${hint}`);
     }
     this.endOverlay.setVisible(true);
   }

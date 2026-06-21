@@ -36,6 +36,16 @@ export interface RunState {
   nextBlobId: number;
 }
 
+export interface UpgradeState {
+  deeperJar: number; // Level
+  goldenSpoon: boolean;
+}
+
+export interface Progression {
+  totalCredits: number;
+  upgrades: UpgradeState;
+}
+
 export interface ChompResult {
   hit: boolean;
   value: number;
