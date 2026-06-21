@@ -14,6 +14,7 @@ import { openPlaytestFeedbackDialog } from "../feedback/feedbackDialog.js";
 import { createPlaytestRunSummary } from "../feedback/playtestFeedback.js";
 import {
   chomp,
+  clickAnt,
   createRun,
   crustCredits,
   frenzyRemaining,
@@ -49,6 +50,7 @@ const COLORS = {
 export class PicnicScene extends Phaser.Scene {
   private state: RunState | null = null;
   private blobSprites = new Map<number, Phaser.GameObjects.Arc>();
+  private antSprites = new Map<number, Phaser.GameObjects.Rectangle>();
   private hud!: Phaser.GameObjects.Text;
   private overlay!: Phaser.GameObjects.Container;
   private endOverlay!: Phaser.GameObjects.Container;
@@ -123,6 +125,7 @@ export class PicnicScene extends Phaser.Scene {
     }
 
     this.syncBlobs();
+    this.syncAnts();
     this.updateHud();
 
     if (this.state.ended) {
@@ -238,9 +241,40 @@ export class PicnicScene extends Phaser.Scene {
     }
   }
 
-  private spawnFloatText(x: number, y: number, text: string): void {
+  private syncAnts(): void {
+    if (!this.state) return;
+    const live = new Set(this.state.ants.map((a) => a.id));
+
+    for (const [id, sprite] of this.antSprites) {
+      if (!live.has(id)) {
+        sprite.destroy();
+        this.antSprites.delete(id);
+      }
+    }
+
+    for (const ant of this.state.ants) {
+      let sprite = this.antSprites.get(ant.id);
+      if (!sprite) {
+        sprite = this.add
+          .rectangle(ant.x, ant.y, 12, 8, 0x000000)
+          .setDepth(10)
+          .setInteractive({ useHandCursor: true });
+        sprite.on("pointerdown", () => {
+          if (this.state && clickAnt(this.state, ant.id)) {
+            playClick();
+            this.spawnFloatText(ant.x, ant.y, "SQUISH", 0xff0000);
+          }
+        });
+        this.antSprites.set(ant.id, sprite);
+      } else {
+        sprite.setPosition(ant.x, ant.y);
+      }
+    }
+  }
+
+  private spawnFloatText(x: number, y: number, text: string, color = 0x5c3d1e): void {
     const t = this.add
-      .text(x, y, text, { fontSize: "18px", fontStyle: "bold", color: "#5c3d1e" })
+      .text(x, y, text, { fontSize: "18px", fontStyle: "bold", color: Phaser.Display.Color.IntegerToColor(color).rgba })
       .setOrigin(0.5)
       .setDepth(30);
     this.floatTexts.push(t);
@@ -490,6 +524,8 @@ export class PicnicScene extends Phaser.Scene {
     playClick();
     for (const [, sprite] of this.blobSprites) sprite.destroy();
     this.blobSprites.clear();
+    for (const [, sprite] of this.antSprites) sprite.destroy();
+    this.antSprites.clear();
     this.floatTexts.forEach((t) => t.destroy());
     this.floatTexts = [];
     this.state = createRun(this.selectedMod);

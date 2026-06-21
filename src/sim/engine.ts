@@ -36,9 +36,11 @@ export function createRun(modifier: ModifierId): RunState {
     running: true,
     ended: null,
     blobs: [],
+    ants: [],
     stickyUntil: 0,
     spawnTimer: 0,
     nextBlobId: 1,
+    nextAntId: 1,
   };
 }
 
@@ -149,6 +151,25 @@ export function chomp(
   return { hit: true, value: val, ended: null };
 }
 
+export function spawnAnt(state: RunState, rng: Rng): void {
+  const x = rng.next() < 0.5 ? 0 : WORLD.width;
+  const y = rng.next() * WORLD.height;
+  state.ants.push({
+    id: state.nextAntId++,
+    x,
+    y,
+    vx: (x === 0 ? 1 : -1) * (40 + rng.next() * 40),
+    vy: (rng.next() - 0.5) * 40,
+    timer: 5 + rng.next() * 5, // 5-10 seconds to steal
+  });
+}
+
+export function clickAnt(state: RunState, antId: number): boolean {
+  const initialCount = state.ants.length;
+  state.ants = state.ants.filter(a => a.id !== antId);
+  return state.ants.length < initialCount;
+}
+
 export function tick(state: RunState, dt: number, nowMs: number, rng: Rng): void {
   if (!state.running) return;
 
@@ -169,6 +190,11 @@ export function tick(state: RunState, dt: number, nowMs: number, rng: Rng): void
   if (state.spawnTimer >= delay) {
     state.spawnTimer = 0;
     spawnBlob(state, rng);
+    
+    // ME-P3: Basic Ant Invasion (10% chance per blob spawn)
+    if (rng.next() < 0.1) {
+      spawnAnt(state, rng);
+    }
   }
 
   for (const b of state.blobs) {
@@ -177,6 +203,22 @@ export function tick(state: RunState, dt: number, nowMs: number, rng: Rng): void
     if (b.x < WORLD.blobBounceXMin || b.x > WORLD.blobBounceXMax) b.vx *= -1;
     if (b.y < WORLD.blobBounceYMin || b.y > WORLD.blobBounceYMax) b.vy *= -1;
   }
+
+  // Handle Ants
+  for (const a of state.ants) {
+    a.x += a.vx * dt;
+    a.y += a.vy * dt;
+    a.timer -= dt;
+    if (a.timer <= 0) {
+      // Steal credits (5 spoons = 1 credit)
+      const stealAmount = 5;
+      state.spoons = Math.max(0, state.spoons - stealAmount);
+      console.log(`ME-P3: Ant ${a.id} stole ${stealAmount} spoons!`);
+      // Remove ant after theft
+      a.timer = 9999; // Mark for removal
+    }
+  }
+  state.ants = state.ants.filter(a => a.timer < 9000);
 
   if (state.jarLeft <= 0 && state.running) {
     endRun(state, "jar_empty");

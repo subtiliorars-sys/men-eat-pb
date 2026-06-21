@@ -19,6 +19,15 @@ export interface ManPosition {
   y: number;
 }
 
+export interface Ant {
+  id: number;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  timer: number; // Time until theft
+}
+
 export interface RunState {
   spoons: number;
   jarMax: number;
@@ -31,9 +40,11 @@ export interface RunState {
   running: boolean;
   ended: RunEndReason;
   blobs: Blob[];
+  ants: Ant[];
   stickyUntil: number;
   spawnTimer: number;
   nextBlobId: number;
+  nextAntId: number;
 }
 
 export interface UpgradeState {
