@@ -53,7 +53,7 @@ export interface UpgradeState {
 }
 
 export interface Progression {
-  totalCredits: number;
+  crustCredits: number;
   upgrades: UpgradeState;
 }
 

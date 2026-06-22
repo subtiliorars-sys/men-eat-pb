@@ -14,20 +14,20 @@ Pending waves for the fleet worker. One PR per wave; run `npm run verify` before
 - [ ] Screen border pulse during Frenzy
 
 ## MEP-W3 — Meta stub
-- [ ] Persist Crust Credits (localStorage)
-- [ ] Upgrade shop: Deeper Jar I, Golden Spoon
-- [ ] Run summary shows unlock hints
+- [x] Persist Crust Credits (localStorage)
+- [x] Upgrade shop: Deeper Jar I, Golden Spoon
+- [x] Run summary shows unlock hints
 
 ## MEP-W4 — Table Events
-- [ ] One mid-run event (*Ant Invasion* or *Mom Says Share*)
-- [ ] Event picker at 50% jar depletion
+- [x] One mid-run event (*Ant Invasion* or *Mom Says Share*)
+- [x] Event picker at 50% jar depletion
 
 ## MEP-W5 — QA gate
 - [ ] `docs/QA_BROWSER.md` + dev QA bridge (DrivingMeNuts pattern)
 - [x] Community playtest feedback intake + volunteer review workflow
 - [x] Dynamic feedback API contract + separate volunteer admin scaffold
 - [x] Optional Worker/D1 feedback backend scaffold
-- [ ] game-provost tutorial audit
+- [ ] game-provost tutorial audit — **STAGED**
 
 ## Ethics
 

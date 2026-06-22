@@ -1,4 +1,24 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// Mock localStorage for node environment
+global.localStorage = {
+  state: {} as Record<string, string>,
+  setItem(key: string, item: string) {
+    this.state[key] = item;
+  },
+  getItem(key: string) {
+    return this.state[key] || null;
+  },
+  removeItem(key: string) {
+    delete this.state[key];
+  },
+  clear() {
+    this.state = {};
+  },
+  length: 0,
+  key: vi.fn(),
+} as any;
+
 import { createRun } from "../sim/engine.js";
 import {
   createPlaytestFeedbackPayload,

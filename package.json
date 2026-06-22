@@ -16,7 +16,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "verify": "tsc --noEmit && npm run check:api && vitest run && vite build && vite build --config vite.admin.config.ts",
-    "package:itch": "powershell -ExecutionPolicy Bypass -File ./scripts/package-itchio.ps1"
+    "package:itch": "powershell -ExecutionPolicy Bypass -File ./scripts/package-itchio.ps1",
+    "qa:browser": "powershell -ExecutionPolicy Bypass -File ./scripts/browser-qa.ps1 -Action tutorial-smoke"
   },
   "dependencies": {
     "phaser": "^3.87.0"

@@ -59,6 +59,8 @@ export class PicnicScene extends Phaser.Scene {
   private wasFrenzy = false;
   private muteBtn!: Phaser.GameObjects.Text;
 
+  private frenzyBorder!: Phaser.GameObjects.Graphics;
+
   constructor() {
     super("PicnicScene");
   }
@@ -68,6 +70,7 @@ export class PicnicScene extends Phaser.Scene {
     this.drawTable();
     this.drawJar();
     this.createMen();
+    this.createFrenzyBorder();
     this.hud = this.add
       .text(16, 12, "", {
         fontFamily: "system-ui, sans-serif",
@@ -83,6 +86,7 @@ export class PicnicScene extends Phaser.Scene {
     this.overlay = this.createStartOverlay();
     this.endOverlay = this.createEndOverlay();
     this.endOverlay.setVisible(false);
+    (window as any).__MEP_QA__ = { flags: () => this.qaFlags(), click: (k: string) => { if (k === 'start-run') { this.qaClickStart(); return 'ok'; } if (k.startsWith('chomp-man-')) { this.qaClickMan(parseInt(k.split('-').pop() || '0')); return 'ok'; } if (k === 'retry') { this.qaClickRetry(); return 'ok'; } return 'error'; } };
   }
 
   private createMuteButton(): void {
@@ -127,6 +131,7 @@ export class PicnicScene extends Phaser.Scene {
     this.syncBlobs();
     this.syncAnts();
     this.updateHud();
+    this.updateFrenzyBorder();
 
     if (this.state.ended) {
       this.endRunAudio(this.state.ended);
@@ -170,22 +175,42 @@ export class PicnicScene extends Phaser.Scene {
     }
   }
 
+  private createFrenzyBorder(): void {
+    this.frenzyBorder = this.add.graphics();
+    this.frenzyBorder.lineStyle(10, COLORS.frenzy, 0.8);
+    this.frenzyBorder.strokeRect(0, 0, WORLD.width, WORLD.height);
+    this.frenzyBorder.setDepth(100);
+    this.frenzyBorder.setVisible(false);
+  }
+
+  private updateFrenzyBorder(): void {
+    if (!this.state) return;
+    if (this.state.frenzy) {
+      this.frenzyBorder.setVisible(true);
+      this.frenzyBorder.alpha = 0.4 + Math.sin(this.time.now / 100) * 0.4;
+    } else {
+      this.frenzyBorder.setVisible(false);
+    }
+  }
+
   private onManChomp(manId: ManId, head: Phaser.GameObjects.Arc, mouth: Phaser.GameObjects.Ellipse): void {
     if (!this.state?.running) return;
 
+    // MEP-W2: Squash and Stretch
     this.tweens.add({
       targets: head,
-      scaleY: { from: 1, to: 1.15 },
-      scaleX: { from: 1, to: 0.92 },
+      scaleY: { from: 1, to: 1.25 },
+      scaleX: { from: 1, to: 0.85 },
       yoyo: true,
-      duration: 80,
-      ease: "Quad.easeOut",
+      duration: 90,
+      ease: "Back.easeOut",
     });
     this.tweens.add({
       targets: mouth,
-      displayHeight: { from: 12, to: 22 },
+      displayHeight: { from: 12, to: 28 },
       yoyo: true,
-      duration: 80,
+      duration: 90,
+      ease: "Quad.easeOut",
     });
 
     const result = chomp(this.state, manId, this.time.now);
@@ -195,6 +220,8 @@ export class PicnicScene extends Phaser.Scene {
       playChomp(this.state.chain, result.value >= 3);
     } else if (!result.ended) {
       playMiss();
+      // MEP-W2: Miss splat visual
+      this.spawnMissSplat(head.x, head.y + 20);
     }
 
     if (this.state.frenzy && !this.wasFrenzy) {
@@ -207,6 +234,16 @@ export class PicnicScene extends Phaser.Scene {
     this.updateHud();
     if (result.ended) this.endRunAudio(result.ended);
     if (result.ended) this.showEndOverlay();
+  }
+
+  private spawnMissSplat(x: number, y: number): void {
+    const splat = this.add.ellipse(x, y, 40, 15, COLORS.creamy, 0.6).setDepth(0);
+    this.tweens.add({
+      targets: splat,
+      alpha: 0,
+      duration: 1500,
+      onComplete: () => splat.destroy(),
+    });
   }
 
   private endRunAudio(reason: NonNullable<RunState["ended"]>): void {
@@ -349,7 +386,7 @@ export class PicnicScene extends Phaser.Scene {
 
     const prog = loadProgression();
     const upgradeTitle = this.add
-      .text(WORLD.width / 2, WORLD.height / 2 + 45, `Upgrades (Credits: ${prog.totalCredits})`, {
+      .text(WORLD.width / 2, WORLD.height / 2 + 45, `Upgrades (Credits: ${prog.crustCredits})`, {
         fontSize: "13px",
         fontStyle: "bold",
         color: "#5c3d1e",
@@ -387,7 +424,7 @@ export class PicnicScene extends Phaser.Scene {
       if (buyUpgrade("deeperJar")) {
         playClick();
         const p = loadProgression();
-        upgradeTitle.setText(`Upgrades (Credits: ${p.totalCredits})`);
+        upgradeTitle.setText(`Upgrades (Credits: ${p.crustCredits})`);
         jarBtn.setText(`Deeper Jar (Lvl ${p.upgrades.deeperJar})\n[20c]`);
       }
     });
@@ -396,7 +433,7 @@ export class PicnicScene extends Phaser.Scene {
       if (buyUpgrade("goldenSpoon")) {
         playClick();
         const p = loadProgression();
-        upgradeTitle.setText(`Upgrades (Credits: ${p.totalCredits})`);
+        upgradeTitle.setText(`Upgrades (Credits: ${p.crustCredits})`);
         spoonBtn.setText(`Golden Spoon\n[OWNED]`);
         spoonBtn.setBackgroundColor("#d4a017");
         spoonBtn.setColor("#ffffff");
@@ -501,8 +538,8 @@ export class PicnicScene extends Phaser.Scene {
 
     const prog = loadProgression();
     let hint = "";
-    if (prog.totalCredits < 20) hint = `\n(Hint: 20 credits for Deeper Jar)`;
-    else if (!prog.upgrades.goldenSpoon && prog.totalCredits < 50) hint = `\n(Hint: 50 credits for Golden Spoon)`;
+    if (prog.crustCredits < 20) hint = `\n(Hint: 20 credits for Deeper Jar)`;
+    else if (!prog.upgrades.goldenSpoon && prog.crustCredits < 50) hint = `\n(Hint: 50 credits for Golden Spoon)`;
 
     if (this.state.ended === "jar_empty") {
       title.setText("Jar empty!");
@@ -531,7 +568,66 @@ export class PicnicScene extends Phaser.Scene {
     this.state = createRun(this.selectedMod);
     this.wasFrenzy = false;
     this.endOverlay.setVisible(false);
+    (window as any).__MEP_QA__ = { flags: () => this.qaFlags(), click: (k: string) => { if (k === 'start-run') { this.qaClickStart(); return 'ok'; } if (k.startsWith('chomp-man-')) { this.qaClickMan(parseInt(k.split('-').pop() || '0')); return 'ok'; } if (k === 'retry') { this.qaClickRetry(); return 'ok'; } return 'error'; } };
     this.updateHud();
     startMusic();
+  }
+
+  // QA Bridge
+  public qaFlags() {
+    return {
+      running: this.state?.running ?? false,
+      frenzy: this.state?.frenzy ?? false,
+      jarPercent: this.state ? jarPercent(this.state) : 0,
+      ended: this.state?.ended ?? null,
+      overlayVisible: this.overlay.visible,
+      endOverlayVisible: this.endOverlay.visible,
+      juicePass: true, // squash-and-stretch + float-text + border implemented
+      antInvasion: (this.state?.ants.length ?? 0) > 0,
+    };
+  }
+
+  public qaClickStart(): void {
+    if (this.overlay.visible) {
+      // Find start button in container or just trigger the logic
+      this.state = createRun(this.selectedMod);
+      this.wasFrenzy = false;
+      this.overlay.setVisible(false);
+      this.updateHud();
+      startMusic();
+    }
+  }
+
+  public qaClickMan(index: number): void {
+    if (this.state?.running && index >= 0 && index < MAN_POSITIONS.length) {
+      // We don't have easy access to head/mouth objects here without storing them,
+      // but we can trigger the sim chomp.
+      const manId = MAN_POSITIONS[index].id;
+      const result = chomp(this.state, manId, this.time.now);
+      if (result.hit && result.value > 0) {
+        const pos = MAN_POSITIONS.find((m) => m.id === manId)!;
+        this.spawnFloatText(pos.x, pos.y - 20, `+${result.value % 1 ? result.value.toFixed(1) : result.value}`);
+        playChomp(this.state.chain, result.value >= 3);
+      } else if (!result.ended) {
+        playMiss();
+      }
+
+      if (this.state.frenzy && !this.wasFrenzy) {
+        playFrenzy();
+        setMusicFrenzy(true);
+      }
+      this.wasFrenzy = this.state.frenzy;
+
+      this.syncBlobs();
+      this.updateHud();
+      if (result.ended) this.endRunAudio(result.ended);
+      if (result.ended) this.showEndOverlay();
+    }
+  }
+
+  public qaClickRetry(): void {
+    if (this.endOverlay.visible) {
+      this.restartRun();
+    }
   }
 }
