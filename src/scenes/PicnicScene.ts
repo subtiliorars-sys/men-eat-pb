@@ -22,7 +22,14 @@ import {
   jarPercent,
   tick,
 } from "../sim/engine.js";
-import { addCredits, buyUpgrade, loadProgression } from "../sim/progression.js";
+import {
+  UPGRADE_COSTS,
+  addCredits,
+  buyUpgrade,
+  deeperJarLabel,
+  loadProgression,
+  upgradeUnlockHint,
+} from "../sim/progression.js";
 import { MODIFIERS } from "../sim/modifiers.js";
 import { defaultRng } from "../sim/rng.js";
 import {
@@ -394,7 +401,11 @@ export class PicnicScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     const jarBtn = this.add
-      .text(WORLD.width / 2 - 75, WORLD.height / 2 + 75, `Deeper Jar (Lvl ${prog.upgrades.deeperJar})\n[20c]`, {
+      .text(
+        WORLD.width / 2 - 75,
+        WORLD.height / 2 + 75,
+        `${deeperJarLabel(prog.upgrades.deeperJar)}\n[${UPGRADE_COSTS.deeperJar}c]`,
+        {
         fontSize: "11px",
         backgroundColor: "#f5e6cc",
         color: "#5c3d1e",
@@ -408,7 +419,7 @@ export class PicnicScene extends Phaser.Scene {
       .text(
         WORLD.width / 2 + 75,
         WORLD.height / 2 + 75,
-        `Golden Spoon\n${prog.upgrades.goldenSpoon ? "[OWNED]" : "[50c]"}`,
+        `Golden Spoon\n${prog.upgrades.goldenSpoon ? "[OWNED]" : `[${UPGRADE_COSTS.goldenSpoon}c]`}`,
         {
           fontSize: "11px",
           backgroundColor: prog.upgrades.goldenSpoon ? "#d4a017" : "#f5e6cc",
@@ -425,7 +436,7 @@ export class PicnicScene extends Phaser.Scene {
         playClick();
         const p = loadProgression();
         upgradeTitle.setText(`Upgrades (Credits: ${p.crustCredits})`);
-        jarBtn.setText(`Deeper Jar (Lvl ${p.upgrades.deeperJar})\n[20c]`);
+        jarBtn.setText(`${deeperJarLabel(p.upgrades.deeperJar)}\n[${UPGRADE_COSTS.deeperJar}c]`);
       }
     });
 
@@ -537,9 +548,8 @@ export class PicnicScene extends Phaser.Scene {
     const total = addCredits(credits);
 
     const prog = loadProgression();
-    let hint = "";
-    if (prog.crustCredits < 20) hint = `\n(Hint: 20 credits for Deeper Jar)`;
-    else if (!prog.upgrades.goldenSpoon && prog.crustCredits < 50) hint = `\n(Hint: 50 credits for Golden Spoon)`;
+    const hintText = upgradeUnlockHint(prog);
+    const hint = hintText ? `\n${hintText}` : "";
 
     if (this.state.ended === "jar_empty") {
       title.setText("Jar empty!");
