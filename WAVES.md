@@ -23,11 +23,11 @@ Pending waves for the fleet worker. One PR per wave; run `npm run verify` before
 - [x] Event picker at 50% jar depletion
 
 ## MEP-W5 — QA gate
-- [ ] `docs/QA_BROWSER.md` + dev QA bridge (DrivingMeNuts pattern)
+- [x] `docs/QA_BROWSER.md` + dev QA bridge (DrivingMeNuts pattern)
 - [x] Community playtest feedback intake + volunteer review workflow
 - [x] Dynamic feedback API contract + separate volunteer admin scaffold
 - [x] Optional Worker/D1 feedback backend scaffold
-- [ ] game-provost tutorial audit — **STAGED**
+- [x] game-provost tutorial audit — **STAGED** (`docs/QA_TUTORIAL_AUDIT.md`)
 
 ## Ethics
 
