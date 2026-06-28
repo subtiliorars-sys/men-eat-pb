@@ -13,7 +13,7 @@ Pending waves for the fleet worker. One PR per wave; run `npm run verify` before
 - [ ] Miss splat visual on table
 - [ ] Screen border pulse during Frenzy
 
-## MEP-W3 — Meta stub
+## MEP-W3 — Meta stub (branch: `automation/wave-mep-w3-meta-stub`)
 - [x] Persist Crust Credits (localStorage)
 - [x] Upgrade shop: Deeper Jar I, Golden Spoon
 - [x] Run summary shows unlock hints

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock localStorage for node environment
 global.localStorage = {
@@ -19,6 +19,10 @@ global.localStorage = {
   key: vi.fn(),
 } as any;
 
+beforeEach(() => {
+  localStorage.clear();
+});
+
 import {
   chomp,
   createRun,
@@ -28,6 +32,7 @@ import {
   spawnBlob,
   tick,
 } from "./engine.js";
+import { saveProgression } from "./progression.js";
 import { createSeededRng } from "./rng.js";
 import { CHOMP_REACH, MAN_POSITIONS, WORLD } from "./types.js";
 
@@ -36,6 +41,12 @@ describe("createRun", () => {
     const run = createRun("crust");
     expect(run.jarMax).toBe(70);
     expect(run.jarLeft).toBe(70);
+  });
+
+  it("applies Deeper Jar upgrade to jar capacity", () => {
+    saveProgression({ crustCredits: 0, upgrades: { deeperJar: 1, goldenSpoon: false } });
+    const run = createRun("double");
+    expect(run.jarMax).toBe(125);
   });
 });
 
@@ -56,6 +67,23 @@ describe("chomp", () => {
     expect(result.value).toBe(1);
     expect(run.spoons).toBe(1);
     expect(run.blobs).toHaveLength(0);
+  });
+
+  it("applies Golden Spoon upgrade to spoon value", () => {
+    saveProgression({ crustCredits: 50, upgrades: { deeperJar: 0, goldenSpoon: true } });
+    const run = createRun("double");
+    run.blobs.push({
+      id: 1,
+      x: 280,
+      y: 250,
+      size: 30,
+      crunchy: false,
+      vx: 0,
+      vy: 0,
+    });
+    const result = chomp(run, "Carl", 0);
+    expect(result.value).toBeCloseTo(1.2);
+    expect(run.spoons).toBeCloseTo(1.2);
   });
 
   it("ends run on stuck shut", () => {
