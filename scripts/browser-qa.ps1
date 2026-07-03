@@ -100,7 +100,7 @@ switch ($Action) {
   }
   "click" {
     if (-not $clickMap.ContainsKey($Target)) {
-      throw "Unknown target '$Target'."
+      throw "Unknown target '$Target'. See docs/QA_CLICK_MAP.md"
     }
     Open-AndWait
     $pt = $clickMap[$Target]
