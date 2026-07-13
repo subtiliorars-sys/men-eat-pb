@@ -1,4 +1,4 @@
-import Phaser from "phaser";
+﻿import Phaser from "phaser";
 import {
   isMuted,
   playChomp,
@@ -23,11 +23,13 @@ import {
   isSticky,
   jarPercent,
   missesUntilStuck,
+  seedTutorialBlobs,
   startTableEvent,
   stickyRemaining,
   tick,
 } from "../sim/engine.js";
 import { TABLE_EVENT_IDS, TABLE_EVENTS } from "../sim/events.js";
+import { LOCATION_IDS, locationDef } from "../sim/locations.js";
 import {
   UPGRADE_COSTS,
   addCredits,
@@ -41,17 +43,15 @@ import { defaultRng } from "../sim/rng.js";
 import {
   MAN_POSITIONS,
   WORLD,
+  type LocationId,
   type ManId,
   type ModifierId,
   type RunState,
   type TableEventId,
 } from "../sim/types.js";
+import { isTutorialCompleted, TutorialState } from "../tutorial/tutorial.js";
 
 const COLORS = {
-  sky: 0x87ceeb,
-  grass: 0x7cb87c,
-  table: 0xdeb887,
-  tableBorder: 0x8b6914,
   skin: 0xf5d0a9,
   mouth: 0x3d2914,
   creamy: 0xc4a574,
@@ -61,25 +61,41 @@ const COLORS = {
   frenzy: 0xff6b35,
 };
 
-const JAR_X = WORLD.width / 2;
-const JAR_Y = WORLD.height * 0.44;
-const JAR_FILL_W = 28;
-const JAR_FILL_H = 32;
+const BLOB_LERP = 0.22;
+
+interface ManVisual {
+  id: ManId;
+  head: Phaser.GameObjects.Arc;
+  mouth: Phaser.GameObjects.Ellipse;
+  glow: Phaser.GameObjects.Arc;
+}
 
 export class PicnicScene extends Phaser.Scene {
   private state: RunState | null = null;
   private blobSprites = new Map<number, Phaser.GameObjects.Arc>();
+  private blobDisplayPos = new Map<number, { x: number; y: number; size: number }>();
   private antSprites = new Map<number, Phaser.GameObjects.Rectangle>();
+  private manVisuals: ManVisual[] = [];
   private hud!: Phaser.GameObjects.Text;
+  private objectiveHud!: Phaser.GameObjects.Text;
   private overlay!: Phaser.GameObjects.Container;
   private endOverlay!: Phaser.GameObjects.Container;
   private eventOverlay!: Phaser.GameObjects.Container;
+  private tutorialOverlay!: Phaser.GameObjects.Container;
+  private frenzyBorder!: Phaser.GameObjects.Graphics;
+  private jarFill!: Phaser.GameObjects.Rectangle;
   private selectedMod: ModifierId = "double";
+  private selectedLocation: LocationId = "park";
   private floatTexts: Phaser.GameObjects.Text[] = [];
   private wasFrenzy = false;
   private muteBtn!: Phaser.GameObjects.Text;
-  private jarFill!: Phaser.GameObjects.Rectangle;
-  private frenzyBorder!: Phaser.GameObjects.Graphics;
+  private backgroundLayer!: Phaser.GameObjects.Container;
+  private tutorial = new TutorialState();
+  private tutorialTitle!: Phaser.GameObjects.Text;
+  private tutorialBody!: Phaser.GameObjects.Text;
+  private tutorialNextBtn!: Phaser.GameObjects.Text;
+  private tutorialSkipBtn!: Phaser.GameObjects.Text;
+  private inTutorialPractice = false;
   private earnedThisRun = 0;
 
   constructor() {
@@ -87,28 +103,51 @@ export class PicnicScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.drawBackground();
-    this.drawTable();
+    this.backgroundLayer = this.add.container(0, 0);
+    this.drawBackground(this.selectedLocation);
+    this.drawTable(this.selectedLocation);
     this.drawJar();
     this.createMen();
     this.createFrenzyBorder();
     this.hud = this.add
       .text(16, 12, "", {
         fontFamily: "system-ui, sans-serif",
-        fontSize: "15px",
+        fontSize: "16px",
         color: "#5c3d1e",
         backgroundColor: "#fff8dc",
         padding: { x: 8, y: 6 },
       })
       .setDepth(20);
 
+    this.objectiveHud = this.add
+      .text(WORLD.width / 2, 52, "Goal: empty the jar!", {
+        fontFamily: "system-ui, sans-serif",
+        fontSize: "14px",
+        fontStyle: "bold",
+        color: "#5c3d1e",
+        backgroundColor: "#fff8dc",
+        padding: { x: 10, y: 5 },
+      })
+      .setOrigin(0.5, 0)
+      .setDepth(20)
+      .setAlpha(0);
+
     this.createMuteButton();
 
     this.overlay = this.createStartOverlay();
     this.eventOverlay = this.createEventOverlay();
     this.endOverlay = this.createEndOverlay();
+    this.tutorialOverlay = this.createTutorialOverlay();
     this.eventOverlay.setVisible(false);
     this.endOverlay.setVisible(false);
+    this.tutorialOverlay.setVisible(false);
+
+    if (!isTutorialCompleted()) {
+      this.tutorial.start();
+      this.tutorialOverlay.setVisible(true);
+      this.refreshTutorialOverlay();
+    }
+
     this.installQaBridge();
   }
 
@@ -121,7 +160,7 @@ export class PicnicScene extends Phaser.Scene {
           return "ok";
         }
         if (k.startsWith("chomp-man-")) {
-          this.qaClickMan(parseInt(k.split("-").pop() || "0", 10));
+          this.qaClickMan(parseInt(k.split("-").pop() || "0"));
           return "ok";
         }
         if (k === "retry") {
@@ -173,13 +212,13 @@ export class PicnicScene extends Phaser.Scene {
         this.wasFrenzy = false;
       }
 
-      this.syncBlobs();
+      this.syncBlobs(dt);
       this.syncAnts();
       this.updateHud();
       this.updateJarFill();
       this.updateFrenzyBorder();
 
-      if (this.state.ended) {
+      if (this.state.ended && !this.inTutorialPractice) {
         this.endRunAudio(this.state.ended);
         this.finalizeRun();
         this.showEndOverlay();
@@ -190,57 +229,72 @@ export class PicnicScene extends Phaser.Scene {
       this.eventOverlay.setVisible(true);
     }
 
-    if (this.state.ended && !this.endOverlay.visible) {
+    if (this.state.ended && !this.endOverlay.visible && !this.inTutorialPractice) {
       this.finalizeRun();
       this.showEndOverlay();
     }
   }
 
-  private drawBackground(): void {
-    this.add.rectangle(WORLD.width / 2, WORLD.height * 0.2, WORLD.width, WORLD.height * 0.45, COLORS.grass);
-    this.add.rectangle(WORLD.width / 2, WORLD.height * 0.72, WORLD.width, WORLD.height * 0.56, 0xa08050);
+  private drawBackground(locationId: LocationId): void {
+    this.backgroundLayer.removeAll(true);
+    const theme = locationDef(locationId);
+    this.backgroundLayer.add(
+      this.add.rectangle(WORLD.width / 2, WORLD.height * 0.2, WORLD.width, WORLD.height * 0.45, theme.sky),
+    );
+    this.backgroundLayer.add(
+      this.add.rectangle(WORLD.width / 2, WORLD.height * 0.72, WORLD.width, WORLD.height * 0.56, theme.ground),
+    );
+    if (locationId === "food_truck") {
+      const truck = this.add.rectangle(120, WORLD.height * 0.62, 90, 50, 0xe74c3c).setStrokeStyle(2, 0xc0392b);
+      const truck2 = this.add
+        .rectangle(WORLD.width - 120, WORLD.height * 0.62, 90, 50, 0x3498db)
+        .setStrokeStyle(2, 0x2980b9);
+      this.backgroundLayer.add(truck);
+      this.backgroundLayer.add(truck2);
+    }
+    if (locationId === "beach") {
+      const wave = this.add.ellipse(WORLD.width / 2, WORLD.height * 0.38, WORLD.width * 0.9, 40, 0x4aa3d8, 0.5);
+      this.backgroundLayer.add(wave);
+    }
   }
 
-  private drawTable(): void {
+  private drawTable(locationId: LocationId): void {
+    const theme = locationDef(locationId);
     const g = this.add.graphics();
-    g.fillStyle(COLORS.table, 1);
-    g.lineStyle(3, COLORS.tableBorder, 1);
+    g.fillStyle(theme.table, 1);
+    g.lineStyle(3, theme.tableBorder, 1);
     g.fillEllipse(WORLD.width / 2, WORLD.height * 0.48, WORLD.width * 0.72, WORLD.height * 0.28);
     g.strokeEllipse(WORLD.width / 2, WORLD.height * 0.48, WORLD.width * 0.72, WORLD.height * 0.28);
+    this.backgroundLayer.add(g);
   }
 
   private drawJar(): void {
-    this.add.rectangle(JAR_X, JAR_Y, 36, 48, 0x444444).setStrokeStyle(2, 0x222222).setDepth(2);
+    this.add
+      .rectangle(WORLD.width / 2, WORLD.height * 0.44, 36, 48, 0x444444)
+      .setStrokeStyle(2, 0x222222)
+      .setDepth(2);
     this.jarFill = this.add
-      .rectangle(JAR_X, JAR_Y + 8, JAR_FILL_W, JAR_FILL_H, COLORS.creamy)
-      .setDepth(3)
-      .setOrigin(0.5, 1);
-  }
-
-  private updateJarFill(): void {
-    if (!this.state) return;
-    const pct = jarPercent(this.state) / 100;
-    const h = Math.max(4, JAR_FILL_H * pct);
-    this.jarFill.setDisplaySize(JAR_FILL_W, h);
-    this.jarFill.setY(JAR_Y + 8 + (JAR_FILL_H - h) / 2);
-    const empty = pct < 0.25;
-    this.jarFill.setFillStyle(empty ? 0xe8c878 : COLORS.creamy);
+      .rectangle(WORLD.width / 2, WORLD.height * 0.44 + 8, 28, 32, COLORS.creamy)
+      .setDepth(1)
+      .setOrigin(0.5, 0.5);
   }
 
   private createMen(): void {
     for (const pos of MAN_POSITIONS) {
+      const glow = this.add.circle(pos.x, pos.y, 36, COLORS.frenzy, 0).setDepth(3);
       const head = this.add
         .circle(pos.x, pos.y, 28, COLORS.skin)
         .setStrokeStyle(3, COLORS.mouth)
         .setInteractive({ useHandCursor: true });
-      const mouth = this.add.ellipse(pos.x, pos.y + 10, 24, 12, COLORS.mouth).setDepth(1);
+      const mouth = this.add.ellipse(pos.x, pos.y + 10, 24, 12, COLORS.mouth).setDepth(4);
       this.add
         .text(pos.x, pos.y + 38, pos.id, { fontSize: "12px", color: "#3d2914", fontStyle: "bold" })
         .setOrigin(0.5, 0)
-        .setDepth(2);
+        .setDepth(5);
 
       head.on("pointerdown", () => this.onManChomp(pos.id, head, mouth));
-      head.setDepth(4);
+      head.setDepth(6);
+      this.manVisuals.push({ id: pos.id, head, mouth, glow });
     }
   }
 
@@ -282,16 +336,20 @@ export class PicnicScene extends Phaser.Scene {
     });
 
     const result = chomp(this.state, manId, this.time.now);
-    const pos = MAN_POSITIONS.find((m) => m.id === manId)!;
-
     if (result.hit && result.value > 0) {
-      const label = result.value % 1 ? result.value.toFixed(1) : String(result.value);
-      this.spawnFloatText(pos.x, pos.y - 20, `+${label}`);
+      const pos = MAN_POSITIONS.find((m) => m.id === manId)!;
+      this.spawnFloatText(pos.x, pos.y - 20, `+${result.value % 1 ? result.value.toFixed(1) : result.value}`);
       playChomp(this.state.chain, result.value >= 3);
     } else if (!result.ended) {
       playMiss();
-      this.spawnMissSplat(pos.x, pos.y + 18);
+      const pos = MAN_POSITIONS.find((m) => m.id === manId)!;
+      this.spawnMissSplat(pos.x + 20, pos.y + 20);
       this.spawnFloatText(pos.x, pos.y - 10, "miss", 0xd94f4f);
+    }
+
+    if (this.tutorial.active) {
+      this.tutorial.onChomp(manId, result.hit);
+      this.refreshTutorialOverlay();
     }
 
     if (this.state.frenzy && !this.wasFrenzy) {
@@ -300,11 +358,9 @@ export class PicnicScene extends Phaser.Scene {
     }
     this.wasFrenzy = this.state.frenzy;
 
-    this.syncBlobs();
-    this.syncAnts();
+    this.syncBlobs(0);
     this.updateHud();
-    this.updateJarFill();
-    if (result.ended) {
+    if (result.ended && !this.inTutorialPractice) {
       this.endRunAudio(result.ended);
       this.finalizeRun();
       this.showEndOverlay();
@@ -312,11 +368,13 @@ export class PicnicScene extends Phaser.Scene {
   }
 
   private spawnMissSplat(x: number, y: number): void {
-    const splat = this.add.ellipse(x, y, 40, 15, COLORS.creamy, 0.6).setDepth(0);
+    const splat = this.add.circle(x, y, 14, COLORS.creamy, 0.85).setStrokeStyle(2, COLORS.mouth).setDepth(15);
     this.tweens.add({
       targets: splat,
+      scaleX: 1.6,
+      scaleY: 0.5,
       alpha: 0,
-      duration: 1500,
+      duration: 400,
       onComplete: () => splat.destroy(),
     });
   }
@@ -327,7 +385,7 @@ export class PicnicScene extends Phaser.Scene {
     else playLose();
   }
 
-  private syncBlobs(): void {
+  private syncBlobs(_dt: number): void {
     if (!this.state) return;
     const live = new Set(this.state.blobs.map((b) => b.id));
 
@@ -335,20 +393,40 @@ export class PicnicScene extends Phaser.Scene {
       if (!live.has(id)) {
         sprite.destroy();
         this.blobSprites.delete(id);
+        this.blobDisplayPos.delete(id);
       }
     }
 
     for (const blob of this.state.blobs) {
+      let display = this.blobDisplayPos.get(blob.id);
+      if (!display) {
+        display = { x: blob.x, y: blob.y, size: blob.size };
+        this.blobDisplayPos.set(blob.id, display);
+      }
+
+      display.x += (blob.x - display.x) * BLOB_LERP;
+      display.y += (blob.y - display.y) * BLOB_LERP;
+      if (Math.abs(display.size - blob.size) > 0.5) {
+        display.size += (blob.size - display.size) * BLOB_LERP;
+      }
+
+      const rx = Math.round(display.x);
+      const ry = Math.round(display.y);
+      const radius = Math.round(display.size / 2);
+
       let sprite = this.blobSprites.get(blob.id);
       if (!sprite) {
         sprite = this.add
-          .circle(blob.x, blob.y, blob.size / 2, blob.crunchy ? COLORS.crunchy : COLORS.creamy)
+          .circle(rx, ry, radius, blob.crunchy ? COLORS.crunchy : COLORS.creamy)
           .setStrokeStyle(2, COLORS.mouth)
           .setDepth(3);
         this.blobSprites.set(blob.id, sprite);
       } else {
-        sprite.setPosition(blob.x, blob.y);
-        sprite.setRadius(blob.size / 2);
+        sprite.setPosition(rx, ry);
+        if (Math.abs(sprite.radius - radius) > 0.5) {
+          sprite.setRadius(radius);
+        }
+        sprite.setFillStyle(blob.crunchy ? COLORS.crunchy : COLORS.creamy);
       }
     }
   }
@@ -413,16 +491,17 @@ export class PicnicScene extends Phaser.Scene {
     const frenzyLine = s.frenzy
       ? `FRENZY ${frenzyRemaining(s)}s`
       : `Frenzy in ${Math.max(0, frenzyThreshold(s) - s.chain)}`;
-    const missLine = `Misses: ${s.missStreak}/5 (${missesUntilStuck(s)} left)`;
+    const missLine = s.tutorialMode
+      ? ""
+      : `  |  Misses: ${s.missStreak}/5 (${missesUntilStuck(s)} left)`;
     const stickyLine = isSticky(s, now) ? `  |  STICKY ${stickyRemaining(s, now)}s` : "";
     const eventLine = s.activeEvent
       ? `  |  ${TABLE_EVENTS[s.activeEvent].label} ${eventRemaining(s)}s`
       : "";
-
+    const loc = locationDef(s.location).label;
     this.hud.setText(
-      `Spoons: ${Math.floor(s.spoons)}  |  Jar: ${Math.ceil(jarPercent(s))}%  |  Chain: ${s.chain}\n${frenzyLine}  |  ${missLine}${stickyLine}${eventLine}`,
+      `${loc}  |  Spoons: ${Math.floor(s.spoons)}  |  Jar: ${Math.ceil(jarPercent(s))}%  |  Chain: ${s.chain}${missLine}${stickyLine}${eventLine}\n${frenzyLine}`,
     );
-
     if (s.frenzy) {
       this.hud.setBackgroundColor("#ff6b35");
       this.hud.setColor("#ffffff");
@@ -436,26 +515,102 @@ export class PicnicScene extends Phaser.Scene {
       this.hud.setBackgroundColor("#fff8dc");
       this.hud.setColor("#5c3d1e");
     }
+    this.objectiveHud.setAlpha(s.running && !this.inTutorialPractice ? 1 : 0);
+  }
+
+  private updateJarFill(): void {
+    if (!this.state || !this.jarFill) return;
+    const pct = jarPercent(this.state) / 100;
+    const maxH = 32;
+    this.jarFill.displayHeight = Math.max(4, maxH * pct);
+    this.jarFill.y = WORLD.height * 0.44 + 8 + (maxH - this.jarFill.displayHeight) / 2;
+  }
+
+  private updateManHighlights(): void {
+    if (!this.tutorial.active) {
+      for (const m of this.manVisuals) m.glow.setFillStyle(COLORS.frenzy, 0);
+      return;
+    }
+    const step = this.tutorial.step;
+    for (const m of this.manVisuals) {
+      const highlight = (step.waitForChompBy && m.id === step.waitForChompBy) || step.highlightAllMen;
+      m.glow.setFillStyle(COLORS.frenzy, highlight ? 0.35 : 0);
+    }
   }
 
   private createStartOverlay(): Phaser.GameObjects.Container {
     const bg = this.add.rectangle(WORLD.width / 2, WORLD.height / 2, WORLD.width, WORLD.height, 0x000000, 0.55);
     const panel = this.add
-      .rectangle(WORLD.width / 2, WORLD.height / 2, 360, 280, COLORS.hudBg)
+      .rectangle(WORLD.width / 2, WORLD.height / 2, 420, 460, COLORS.hudBg)
       .setStrokeStyle(4, COLORS.mouth);
     const title = this.add
-      .text(WORLD.width / 2, WORLD.height / 2 - 90, "Picnic time", {
+      .text(WORLD.width / 2, WORLD.height / 2 - 195, "Picnic time", {
         fontSize: "24px",
         fontStyle: "bold",
         color: "#5c3d1e",
       })
       .setOrigin(0.5);
     const sub = this.add
-      .text(WORLD.width / 2, WORLD.height / 2 - 55, "Pick a lunch modifier, then tap a man to chomp.", {
-        fontSize: "14px",
+      .text(WORLD.width / 2, WORLD.height / 2 - 165, "Pick a location & lunch modifier, then tap a man to chomp blobs.", {
+        fontSize: "13px",
         color: "#6b5344",
-        wordWrap: { width: 300 },
+        wordWrap: { width: 360 },
         align: "center",
+      })
+      .setOrigin(0.5);
+
+    const locLabel = this.add
+      .text(WORLD.width / 2, WORLD.height / 2 - 135, "Location", {
+        fontSize: "12px",
+        fontStyle: "bold",
+        color: "#5c3d1e",
+      })
+      .setOrigin(0.5);
+
+    const locButtons: Phaser.GameObjects.Text[] = [];
+    LOCATION_IDS.forEach((id, i) => {
+      const col = i % 2;
+      const row = Math.floor(i / 2);
+      const theme = locationDef(id);
+      const btn = this.add
+        .text(WORLD.width / 2 - 95 + col * 190, WORLD.height / 2 - 108 + row * 34, theme.label, {
+          fontSize: "11px",
+          backgroundColor: id === this.selectedLocation ? "#d4a017" : "#f5e6cc",
+          color: id === this.selectedLocation ? "#ffffff" : "#5c3d1e",
+          padding: { x: 6, y: 5 },
+        })
+        .setOrigin(0.5)
+        .setInteractive({ useHandCursor: true });
+      btn.on("pointerdown", () => {
+        playClick();
+        this.selectedLocation = id;
+        this.drawBackground(id);
+        this.drawTable(id);
+        locButtons.forEach((b, j) => {
+          const lid = LOCATION_IDS[j];
+          b.setBackgroundColor(lid === id ? "#d4a017" : "#f5e6cc");
+          b.setColor(lid === id ? "#ffffff" : "#5c3d1e");
+        });
+        locBlurb.setText(theme.blurb);
+      });
+      locButtons.push(btn);
+    });
+
+    const locBlurb = this.add
+      .text(WORLD.width / 2, WORLD.height / 2 - 32, locationDef(this.selectedLocation).blurb, {
+        fontSize: "11px",
+        color: "#8b7355",
+        fontStyle: "italic",
+        align: "center",
+        wordWrap: { width: 340 },
+      })
+      .setOrigin(0.5);
+
+    const modLabel = this.add
+      .text(WORLD.width / 2, WORLD.height / 2 - 10, "Lunch modifier", {
+        fontSize: "12px",
+        fontStyle: "bold",
+        color: "#5c3d1e",
       })
       .setOrigin(0.5);
 
@@ -463,7 +618,7 @@ export class PicnicScene extends Phaser.Scene {
     const mods: ModifierId[] = ["double", "napkins", "crust"];
     mods.forEach((id, i) => {
       const btn = this.add
-        .text(WORLD.width / 2 - 100 + i * 100, WORLD.height / 2 - 10, MODIFIERS[id].label, {
+        .text(WORLD.width / 2 - 100 + i * 100, WORLD.height / 2 + 18, MODIFIERS[id].label, {
           fontSize: "12px",
           backgroundColor: id === this.selectedMod ? "#d4a017" : "#f5e6cc",
           color: id === this.selectedMod ? "#ffffff" : "#5c3d1e",
@@ -485,7 +640,7 @@ export class PicnicScene extends Phaser.Scene {
 
     const prog = loadProgression();
     const upgradeTitle = this.add
-      .text(WORLD.width / 2, WORLD.height / 2 + 45, `Upgrades (Credits: ${prog.crustCredits})`, {
+      .text(WORLD.width / 2, WORLD.height / 2 + 52, `Upgrades (Credits: ${prog.crustCredits})`, {
         fontSize: "13px",
         fontStyle: "bold",
         color: "#5c3d1e",
@@ -495,7 +650,7 @@ export class PicnicScene extends Phaser.Scene {
     const jarBtn = this.add
       .text(
         WORLD.width / 2 - 75,
-        WORLD.height / 2 + 75,
+        WORLD.height / 2 + 82,
         `${deeperJarLabel(prog.upgrades.deeperJar)}\n[${UPGRADE_COSTS.deeperJar}c]`,
         {
           fontSize: "11px",
@@ -511,7 +666,7 @@ export class PicnicScene extends Phaser.Scene {
     const spoonBtn = this.add
       .text(
         WORLD.width / 2 + 75,
-        WORLD.height / 2 + 75,
+        WORLD.height / 2 + 82,
         `Golden Spoon\n${prog.upgrades.goldenSpoon ? "[OWNED]" : `[${UPGRADE_COSTS.goldenSpoon}c]`}`,
         {
           fontSize: "11px",
@@ -544,8 +699,26 @@ export class PicnicScene extends Phaser.Scene {
       }
     });
 
+    const tutorialBtn = this.add
+      .text(WORLD.width / 2, WORLD.height / 2 + 130, "Replay tutorial", {
+        fontSize: "12px",
+        color: "#6b5344",
+        backgroundColor: "#f5e6cc",
+        padding: { x: 8, y: 4 },
+      })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true });
+
+    tutorialBtn.on("pointerdown", () => {
+      playClick();
+      this.tutorial.start();
+      this.overlay.setVisible(false);
+      this.tutorialOverlay.setVisible(true);
+      this.refreshTutorialOverlay();
+    });
+
     const startBtn = this.add
-      .text(WORLD.width / 2, WORLD.height / 2 + 125, "Open the jar", {
+      .text(WORLD.width / 2, WORLD.height / 2 + 175, "Open the jar", {
         fontSize: "18px",
         fontStyle: "bold",
         backgroundColor: "#d4a017",
@@ -557,7 +730,7 @@ export class PicnicScene extends Phaser.Scene {
 
     startBtn.on("pointerdown", () => {
       playClick();
-      this.beginRun();
+      this.beginRun(false);
     });
 
     const container = this.add.container(0, 0, [
@@ -565,13 +738,73 @@ export class PicnicScene extends Phaser.Scene {
       panel,
       title,
       sub,
+      locLabel,
+      ...locButtons,
+      locBlurb,
+      modLabel,
       ...modButtons,
       upgradeTitle,
       jarBtn,
       spoonBtn,
+      tutorialBtn,
       startBtn,
     ]);
     container.setDepth(50);
+    return container;
+  }
+
+  private createTutorialOverlay(): Phaser.GameObjects.Container {
+    const bg = this.add.rectangle(WORLD.width / 2, WORLD.height / 2, WORLD.width, WORLD.height, 0x000000, 0.45);
+    const panel = this.add
+      .rectangle(WORLD.width / 2, WORLD.height - 95, 440, 150, COLORS.hudBg)
+      .setStrokeStyle(3, COLORS.mouth);
+    this.tutorialTitle = this.add
+      .text(WORLD.width / 2, WORLD.height - 145, "", {
+        fontSize: "18px",
+        fontStyle: "bold",
+        color: "#5c3d1e",
+      })
+      .setOrigin(0.5);
+    this.tutorialBody = this.add
+      .text(WORLD.width / 2, WORLD.height - 115, "", {
+        fontSize: "13px",
+        color: "#6b5344",
+        wordWrap: { width: 400 },
+        align: "center",
+      })
+      .setOrigin(0.5, 0);
+    this.tutorialNextBtn = this.add
+      .text(WORLD.width / 2 + 70, WORLD.height - 45, "Next", {
+        fontSize: "15px",
+        fontStyle: "bold",
+        backgroundColor: "#d4a017",
+        color: "#ffffff",
+        padding: { x: 14, y: 7 },
+      })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true });
+    this.tutorialSkipBtn = this.add
+      .text(WORLD.width / 2 - 80, WORLD.height - 45, "Skip tutorial", {
+        fontSize: "13px",
+        color: "#6b5344",
+        backgroundColor: "#f5e6cc",
+        padding: { x: 10, y: 6 },
+      })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true });
+
+    this.tutorialNextBtn.on("pointerdown", () => this.onTutorialNext());
+    this.tutorialSkipBtn.on("pointerdown", () => this.finishTutorial());
+
+    const container = this.add.container(0, 0, [
+      bg,
+      panel,
+      this.tutorialTitle,
+      this.tutorialBody,
+      this.tutorialNextBtn,
+      this.tutorialSkipBtn,
+    ]);
+    container.setDepth(55);
     return container;
   }
 
@@ -620,7 +853,7 @@ export class PicnicScene extends Phaser.Scene {
     });
 
     const container = this.add.container(0, 0, [bg, panel, title, sub, ...eventButtons]);
-    container.setDepth(55);
+    container.setDepth(56);
     return container;
   }
 
@@ -632,6 +865,83 @@ export class PicnicScene extends Phaser.Scene {
     this.wasFrenzy = this.state.frenzy;
     this.updateHud();
     this.updateJarFill();
+  }
+
+  private refreshTutorialOverlay(): void {
+    const step = this.tutorial.step;
+    this.tutorialTitle.setText(step.title);
+    this.tutorialBody.setText(step.body);
+    const needsAction = !!(step.waitForChompBy || step.waitForAnyChomp);
+    this.tutorialNextBtn.setVisible(!needsAction);
+    this.tutorialNextBtn.setText(step.id === "done" ? "Start playing" : "Next");
+    this.updateManHighlights();
+
+    const practiceSteps = step.id === "tap_carl" || step.id === "tap_any";
+    if (practiceSteps && !this.inTutorialPractice) {
+      this.beginRun(true);
+    }
+    if (!practiceSteps && this.inTutorialPractice) {
+      this.stopTutorialPractice();
+    }
+  }
+
+  private onTutorialNext(): void {
+    if (this.tutorial.step.id === "done") {
+      this.finishTutorial();
+      return;
+    }
+    this.tutorial.tryAdvance();
+    if (this.tutorial.completed) {
+      this.finishTutorial();
+    } else {
+      this.refreshTutorialOverlay();
+    }
+  }
+
+  private finishTutorial(): void {
+    this.tutorial.skip();
+    this.stopTutorialPractice();
+    this.tutorialOverlay.setVisible(false);
+    this.overlay.setVisible(true);
+    this.updateManHighlights();
+  }
+
+  private beginRun(tutorialMode: boolean): void {
+    this.inTutorialPractice = tutorialMode;
+    this.earnedThisRun = 0;
+    for (const [, sprite] of this.blobSprites) sprite.destroy();
+    this.blobSprites.clear();
+    this.blobDisplayPos.clear();
+    for (const [, sprite] of this.antSprites) sprite.destroy();
+    this.antSprites.clear();
+
+    this.state = createRun(this.selectedMod, this.selectedLocation, { tutorialMode });
+    if (tutorialMode) {
+      seedTutorialBlobs(this.state);
+    }
+    this.wasFrenzy = false;
+    this.overlay.setVisible(false);
+    this.eventOverlay.setVisible(false);
+    this.tutorialOverlay.setVisible(this.tutorial.active);
+    this.endOverlay.setVisible(false);
+    this.syncBlobs(0);
+    this.updateHud();
+    this.updateJarFill();
+    this.updateManHighlights();
+    if (!tutorialMode) startMusic();
+  }
+
+  private stopTutorialPractice(): void {
+    this.inTutorialPractice = false;
+    if (this.state) {
+      this.state.running = false;
+      this.state = null;
+    }
+    for (const [, sprite] of this.blobSprites) sprite.destroy();
+    this.blobSprites.clear();
+    this.blobDisplayPos.clear();
+    for (const [, sprite] of this.antSprites) sprite.destroy();
+    this.antSprites.clear();
   }
 
   private createEndOverlay(): Phaser.GameObjects.Container {
@@ -707,15 +1017,18 @@ export class PicnicScene extends Phaser.Scene {
     const msg = this.endOverlay.getByName("endMsg") as Phaser.GameObjects.Text;
     const earned = this.earnedThisRun || crustCredits(this.state);
     const total = loadProgression().crustCredits;
-    const hintText = upgradeUnlockHint(loadProgression());
+    const loc = locationDef(this.state.location).label;
+
+    const prog = loadProgression();
+    const hintText = upgradeUnlockHint(prog);
     const hint = hintText ? `\n${hintText}` : "";
 
     if (this.state.ended === "jar_empty") {
       title.setText("Jar empty!");
-      msg.setText(`Spoons: ${Math.floor(this.state.spoons)}\n+${earned} Crust Credits (total: ${total})${hint}`);
+      msg.setText(`${loc}\nSpoons: ${Math.floor(this.state.spoons)}\n+${earned} Crust Credits (total: ${total})${hint}`);
     } else {
       title.setText("Stuck Shut!");
-      msg.setText(`Too much peanut butter.\n+${earned} Crust Credits (total: ${total})${hint}`);
+      msg.setText(`Too much peanut butter.\n${loc}\n+${earned} Crust Credits (total: ${total})${hint}`);
     }
     this.endOverlay.setVisible(true);
   }
@@ -726,21 +1039,11 @@ export class PicnicScene extends Phaser.Scene {
     openPlaytestFeedbackDialog(createPlaytestRunSummary(this.state));
   }
 
-  private beginRun(): void {
-    this.state = createRun(this.selectedMod);
-    this.earnedThisRun = 0;
-    this.wasFrenzy = false;
-    this.overlay.setVisible(false);
-    this.eventOverlay.setVisible(false);
-    this.updateHud();
-    this.updateJarFill();
-    startMusic();
-  }
-
   private restartRun(): void {
     playClick();
     for (const [, sprite] of this.blobSprites) sprite.destroy();
     this.blobSprites.clear();
+    this.blobDisplayPos.clear();
     for (const [, sprite] of this.antSprites) sprite.destroy();
     this.antSprites.clear();
     this.floatTexts.forEach((t) => t.destroy());
@@ -764,12 +1067,13 @@ export class PicnicScene extends Phaser.Scene {
       activeEvent: this.state?.activeEvent ?? null,
       juicePass: true,
       antInvasion: (this.state?.ants.length ?? 0) > 0,
+      tutorialActive: this.tutorial.active,
     };
   }
 
   public qaClickStart(): void {
     if (this.overlay.visible) {
-      this.beginRun();
+      this.beginRun(false);
     }
   }
 
@@ -791,11 +1095,9 @@ export class PicnicScene extends Phaser.Scene {
       }
       this.wasFrenzy = this.state.frenzy;
 
-      this.syncBlobs();
-      this.syncAnts();
+      this.syncBlobs(0);
       this.updateHud();
-      this.updateJarFill();
-      if (result.ended) {
+      if (result.ended && !this.inTutorialPractice) {
         this.endRunAudio(result.ended);
         this.finalizeRun();
         this.showEndOverlay();

@@ -175,6 +175,24 @@ describe("reachability", () => {
   });
 });
 
+describe("tutorial mode", () => {
+  it("does not end run on repeated misses", () => {
+    const run = createRun("double", "park", { tutorialMode: true });
+    for (let i = 0; i < 8; i++) {
+      chomp(run, "Carl", i * 100);
+    }
+    expect(run.ended).toBeNull();
+    expect(run.running).toBe(true);
+  });
+});
+
+describe("locations", () => {
+  it("stores location on run state", () => {
+    const run = createRun("double", "food_truck");
+    expect(run.location).toBe("food_truck");
+  });
+});
+
 describe("spawnBlob cap", () => {
   it("evicts oldest blob at MAX_BLOBS", () => {
     const run = createRun("double");
