@@ -71,3 +71,9 @@ Vertical slice v0.1 — chomp loop, three modifiers, Frenzy, run end screens.
 Next waves: juice/SFX, meta upgrades, Table Events (`WAVES.md`).
 
 
+
+
+## Shared asset libraries
+
+**Agents:** do not invent colored-box placeholders when free art exists.
+See [docs/ASSETS.md](docs/ASSETS.md) → `game-visual-assets`, `game-audio-assets`, `game-3d-assets`.
