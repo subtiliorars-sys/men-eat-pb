@@ -634,13 +634,24 @@ export class PicnicScene extends Phaser.Scene {
           b.setBackgroundColor(mid === id ? "#d4a017" : "#f5e6cc");
           b.setColor(mid === id ? "#ffffff" : "#5c3d1e");
         });
+        modBlurb.setText(MODIFIERS[id].blurb);
       });
       modButtons.push(btn);
     });
 
+    const modBlurb = this.add
+      .text(WORLD.width / 2, WORLD.height / 2 + 42, MODIFIERS[this.selectedMod].blurb, {
+        fontSize: "11px",
+        color: "#8b7355",
+        fontStyle: "italic",
+        align: "center",
+        wordWrap: { width: 340 },
+      })
+      .setOrigin(0.5);
+
     const prog = loadProgression();
     const upgradeTitle = this.add
-      .text(WORLD.width / 2, WORLD.height / 2 + 52, `Upgrades (Credits: ${prog.crustCredits})`, {
+      .text(WORLD.width / 2, WORLD.height / 2 + 68, `Upgrades (Credits: ${prog.crustCredits})`, {
         fontSize: "13px",
         fontStyle: "bold",
         color: "#5c3d1e",
@@ -650,7 +661,7 @@ export class PicnicScene extends Phaser.Scene {
     const jarBtn = this.add
       .text(
         WORLD.width / 2 - 75,
-        WORLD.height / 2 + 82,
+        WORLD.height / 2 + 98,
         `${deeperJarLabel(prog.upgrades.deeperJar)}\n[${UPGRADE_COSTS.deeperJar}c]`,
         {
           fontSize: "11px",
@@ -666,7 +677,7 @@ export class PicnicScene extends Phaser.Scene {
     const spoonBtn = this.add
       .text(
         WORLD.width / 2 + 75,
-        WORLD.height / 2 + 82,
+        WORLD.height / 2 + 98,
         `Golden Spoon\n${prog.upgrades.goldenSpoon ? "[OWNED]" : `[${UPGRADE_COSTS.goldenSpoon}c]`}`,
         {
           fontSize: "11px",
@@ -700,7 +711,7 @@ export class PicnicScene extends Phaser.Scene {
     });
 
     const tutorialBtn = this.add
-      .text(WORLD.width / 2, WORLD.height / 2 + 130, "Replay tutorial", {
+      .text(WORLD.width / 2, WORLD.height / 2 + 146, "Replay tutorial", {
         fontSize: "12px",
         color: "#6b5344",
         backgroundColor: "#f5e6cc",
@@ -717,8 +728,16 @@ export class PicnicScene extends Phaser.Scene {
       this.refreshTutorialOverlay();
     });
 
+    const soundHint = this.add
+      .text(WORLD.width / 2, WORLD.height / 2 + 168, "Sound: tap 🔊 / 🔇 in the top-right anytime.", {
+        fontSize: "11px",
+        color: "#8b7355",
+        align: "center",
+      })
+      .setOrigin(0.5);
+
     const startBtn = this.add
-      .text(WORLD.width / 2, WORLD.height / 2 + 175, "Open the jar", {
+      .text(WORLD.width / 2, WORLD.height / 2 + 198, "Open the jar", {
         fontSize: "18px",
         fontStyle: "bold",
         backgroundColor: "#d4a017",
@@ -743,10 +762,12 @@ export class PicnicScene extends Phaser.Scene {
       locBlurb,
       modLabel,
       ...modButtons,
+      modBlurb,
       upgradeTitle,
       jarBtn,
       spoonBtn,
       tutorialBtn,
+      soundHint,
       startBtn,
     ]);
     container.setDepth(50);
