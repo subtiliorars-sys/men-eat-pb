@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  UPGRADE_BLURBS,
   UPGRADE_COSTS,
   addCredits,
   buyUpgrade,
@@ -101,6 +102,13 @@ describe("deeperJarLabel", () => {
   it("uses roman numerals for early tiers", () => {
     expect(deeperJarLabel(0)).toBe("Deeper Jar I");
     expect(deeperJarLabel(1)).toBe("Deeper Jar II");
+  });
+});
+
+describe("UPGRADE_BLURBS", () => {
+  it("describes each shop item in plain language", () => {
+    expect(UPGRADE_BLURBS.deeperJar).toMatch(/25%/);
+    expect(UPGRADE_BLURBS.goldenSpoon).toMatch(/20%/);
   });
 });
 
