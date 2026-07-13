@@ -31,6 +31,7 @@ import {
 import { TABLE_EVENT_IDS, TABLE_EVENTS } from "../sim/events.js";
 import { LOCATION_IDS, locationDef } from "../sim/locations.js";
 import {
+  UPGRADE_BLURBS,
   UPGRADE_COSTS,
   addCredits,
   buyUpgrade,
@@ -541,7 +542,7 @@ export class PicnicScene extends Phaser.Scene {
   private createStartOverlay(): Phaser.GameObjects.Container {
     const bg = this.add.rectangle(WORLD.width / 2, WORLD.height / 2, WORLD.width, WORLD.height, 0x000000, 0.55);
     const panel = this.add
-      .rectangle(WORLD.width / 2, WORLD.height / 2, 420, 460, COLORS.hudBg)
+      .rectangle(WORLD.width / 2, WORLD.height / 2, 420, 480, COLORS.hudBg)
       .setStrokeStyle(4, COLORS.mouth);
     const title = this.add
       .text(WORLD.width / 2, WORLD.height / 2 - 195, "Picnic time", {
@@ -710,8 +711,23 @@ export class PicnicScene extends Phaser.Scene {
       }
     });
 
+    const upgradeBlurb = this.add
+      .text(
+        WORLD.width / 2,
+        WORLD.height / 2 + 128,
+        `${UPGRADE_BLURBS.deeperJar} ${UPGRADE_BLURBS.goldenSpoon}`,
+        {
+          fontSize: "10px",
+          color: "#8b7355",
+          fontStyle: "italic",
+          align: "center",
+          wordWrap: { width: 360 },
+        },
+      )
+      .setOrigin(0.5);
+
     const tutorialBtn = this.add
-      .text(WORLD.width / 2, WORLD.height / 2 + 146, "Replay tutorial", {
+      .text(WORLD.width / 2, WORLD.height / 2 + 156, "Replay tutorial", {
         fontSize: "12px",
         color: "#6b5344",
         backgroundColor: "#f5e6cc",
@@ -729,7 +745,7 @@ export class PicnicScene extends Phaser.Scene {
     });
 
     const soundHint = this.add
-      .text(WORLD.width / 2, WORLD.height / 2 + 168, "Sound: tap 🔊 / 🔇 in the top-right anytime.", {
+      .text(WORLD.width / 2, WORLD.height / 2 + 178, "Sound: tap 🔊 / 🔇 in the top-right anytime.", {
         fontSize: "11px",
         color: "#8b7355",
         align: "center",
@@ -737,7 +753,7 @@ export class PicnicScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     const startBtn = this.add
-      .text(WORLD.width / 2, WORLD.height / 2 + 198, "Open the jar", {
+      .text(WORLD.width / 2, WORLD.height / 2 + 208, "Open the jar", {
         fontSize: "18px",
         fontStyle: "bold",
         backgroundColor: "#d4a017",
@@ -766,6 +782,7 @@ export class PicnicScene extends Phaser.Scene {
       upgradeTitle,
       jarBtn,
       spoonBtn,
+      upgradeBlurb,
       tutorialBtn,
       soundHint,
       startBtn,

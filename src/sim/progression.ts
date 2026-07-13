@@ -7,6 +7,12 @@ export const UPGRADE_COSTS = {
   goldenSpoon: 50,
 } as const;
 
+/** One-line player-facing summaries on the start overlay. */
+export const UPGRADE_BLURBS = {
+  deeperJar: "Each level adds 25% jar capacity.",
+  goldenSpoon: "+20% spoon value on every chomp (one-time).",
+} as const;
+
 const DEFAULT_PROGRESSION: Progression = {
   crustCredits: 0,
   upgrades: {
