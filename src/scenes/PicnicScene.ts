@@ -104,6 +104,8 @@ export class PicnicScene extends Phaser.Scene {
   private tutorialSkipBtn!: Phaser.GameObjects.Text;
   private inTutorialPractice = false;
   private earnedThisRun = 0;
+  private tabHidden = false;
+  private onVisibilityChange!: () => void;
 
   constructor() {
     super("PicnicScene");
@@ -141,6 +143,7 @@ export class PicnicScene extends Phaser.Scene {
 
     this.createMuteButton();
     this.installKeyboardControls();
+    this.installTabHidePause();
 
     this.overlay = this.createStartOverlay();
     this.eventOverlay = this.createEventOverlay();
@@ -206,6 +209,24 @@ export class PicnicScene extends Phaser.Scene {
 
   private muteLabel(): string {
     return isMuted() ? "🔇 Sound off" : "🔊 Sound on";
+  }
+
+  private installTabHidePause(): void {
+    this.onVisibilityChange = () => {
+      this.tabHidden = document.hidden;
+      if (this.tabHidden) {
+        stopMusic();
+        return;
+      }
+      if (this.state?.running && !isMuted()) {
+        startMusic();
+        setMusicFrenzy(this.state.frenzy);
+      }
+    };
+    document.addEventListener("visibilitychange", this.onVisibilityChange);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      document.removeEventListener("visibilitychange", this.onVisibilityChange);
+    });
   }
 
   private installKeyboardControls(): void {
@@ -277,7 +298,7 @@ export class PicnicScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
-    if (!this.state) return;
+    if (!this.state || this.tabHidden) return;
 
     if (this.state.running) {
       const dt = Math.min(delta / 1000, 0.05);
