@@ -708,7 +708,8 @@ export class PicnicScene extends Phaser.Scene {
         fontStyle: "bold",
         color: "#5c3d1e",
       })
-      .setOrigin(0.5);
+      .setOrigin(0.5)
+      .setName("startUpgradeTitle");
 
     const jarBtn = this.add
       .text(
@@ -724,7 +725,8 @@ export class PicnicScene extends Phaser.Scene {
         },
       )
       .setOrigin(0.5)
-      .setInteractive({ useHandCursor: true });
+      .setInteractive({ useHandCursor: true })
+      .setName("startJarBtn");
 
     const spoonBtn = this.add
       .text(
@@ -740,25 +742,20 @@ export class PicnicScene extends Phaser.Scene {
         },
       )
       .setOrigin(0.5)
-      .setInteractive({ useHandCursor: true });
+      .setInteractive({ useHandCursor: true })
+      .setName("startSpoonBtn");
 
     jarBtn.on("pointerdown", () => {
       if (buyUpgrade("deeperJar")) {
         playClick();
-        const p = loadProgression();
-        upgradeTitle.setText(`Upgrades (Credits: ${p.crustCredits})`);
-        jarBtn.setText(`${deeperJarLabel(p.upgrades.deeperJar)}\n[${UPGRADE_COSTS.deeperJar}c]`);
+        this.refreshStartOverlayShop();
       }
     });
 
     spoonBtn.on("pointerdown", () => {
       if (buyUpgrade("goldenSpoon")) {
         playClick();
-        const p = loadProgression();
-        upgradeTitle.setText(`Upgrades (Credits: ${p.crustCredits})`);
-        spoonBtn.setText(`Golden Spoon\n[OWNED]`);
-        spoonBtn.setBackgroundColor("#d4a017");
-        spoonBtn.setColor("#ffffff");
+        this.refreshStartOverlayShop();
       }
     });
 
@@ -840,6 +837,27 @@ export class PicnicScene extends Phaser.Scene {
     ]);
     container.setDepth(50);
     return container;
+  }
+
+  /** Keep start-screen credit totals in sync after a run or shop purchase. */
+  private refreshStartOverlayShop(): void {
+    const prog = loadProgression();
+    const upgradeTitle = this.overlay.getByName("startUpgradeTitle") as Phaser.GameObjects.Text | null;
+    const jarBtn = this.overlay.getByName("startJarBtn") as Phaser.GameObjects.Text | null;
+    const spoonBtn = this.overlay.getByName("startSpoonBtn") as Phaser.GameObjects.Text | null;
+    if (!upgradeTitle || !jarBtn || !spoonBtn) return;
+
+    upgradeTitle.setText(`Upgrades (Credits: ${prog.crustCredits})`);
+    jarBtn.setText(`${deeperJarLabel(prog.upgrades.deeperJar)}\n[${UPGRADE_COSTS.deeperJar}c]`);
+    if (prog.upgrades.goldenSpoon) {
+      spoonBtn.setText("Golden Spoon\n[OWNED]");
+      spoonBtn.setBackgroundColor("#d4a017");
+      spoonBtn.setColor("#ffffff");
+    } else {
+      spoonBtn.setText(`Golden Spoon\n[${UPGRADE_COSTS.goldenSpoon}c]`);
+      spoonBtn.setBackgroundColor("#f5e6cc");
+      spoonBtn.setColor("#5c3d1e");
+    }
   }
 
   private createTutorialOverlay(): Phaser.GameObjects.Container {
@@ -1138,6 +1156,7 @@ export class PicnicScene extends Phaser.Scene {
     this.floatTexts.forEach((t) => t.destroy());
     this.floatTexts = [];
     this.endOverlay.setVisible(false);
+    this.refreshStartOverlayShop();
     this.overlay.setVisible(true);
     this.state = null;
     stopMusic();
