@@ -5,6 +5,8 @@ Tap to chomp. Short runs, modifier picks, Crust Credits meta (stub).
 
 **Design docs (MeniscusMaximus):** [GAME_IDEAS.md #7](https://github.com/subtiliorars-sys/MeniscusMaximus/blob/master/GAME_IDEAS.md) · [MEN_EAT_PB_SLICE.md](https://github.com/subtiliorars-sys/MeniscusMaximus/blob/master/MEN_EAT_PB_SLICE.md)
 
+**Play:** https://subtiliorars-sys.github.io/men-eat-pb/
+
 ## Quick start
 
 ```bash

@@ -239,6 +239,28 @@ export class PicnicScene extends Phaser.Scene {
         return;
       }
 
+      if (event.key === "Enter" || event.key === " ") {
+        if (document.querySelector("[data-playtest-feedback-dialog]") || this.eventOverlay.visible) {
+          return;
+        }
+        if (this.tutorialOverlay.visible) {
+          if (!this.tutorialNextBtn.visible) return;
+          playClick();
+          this.onTutorialNext();
+          return;
+        }
+        if (this.endOverlay.visible) {
+          playClick();
+          this.restartRun();
+          return;
+        }
+        if (this.overlay.visible) {
+          playClick();
+          this.beginRun(false);
+          return;
+        }
+      }
+
       const manIndex = Number.parseInt(event.key, 10) - 1;
       if (manIndex < 0 || manIndex >= MAN_POSITIONS.length || !this.state?.running || this.state.eventPending) {
         return;
@@ -793,7 +815,11 @@ export class PicnicScene extends Phaser.Scene {
     });
 
     const soundHint = this.add
-      .text(WORLD.width / 2, WORLD.height / 2 + 178, "Keys 1–4 chomp Carl–Ed · M toggles sound · Esc closes dialogs.", {
+      .text(
+        WORLD.width / 2,
+        WORLD.height / 2 + 178,
+        "Keys 1–4 chomp Carl–Ed · Enter/Space confirms · M toggles sound · Esc back.",
+        {
         fontSize: "11px",
         color: "#8b7355",
         align: "center",
