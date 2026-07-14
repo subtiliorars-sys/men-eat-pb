@@ -40,6 +40,7 @@ import {
   upgradeUnlockHint,
 } from "../sim/progression.js";
 import { MODIFIERS } from "../sim/modifiers.js";
+import { objectiveLine } from "../sim/objective.js";
 import { defaultRng } from "../sim/rng.js";
 import {
   MAN_POSITIONS,
@@ -564,6 +565,9 @@ export class PicnicScene extends Phaser.Scene {
       this.hud.setColor("#5c3d1e");
     }
     this.objectiveHud.setAlpha(s.running && !this.inTutorialPractice ? 1 : 0);
+    if (s.running && !this.inTutorialPractice) {
+      this.objectiveHud.setText(objectiveLine(s, now));
+    }
   }
 
   private updateJarFill(): void {
