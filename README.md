@@ -3,9 +3,14 @@
 Roguelike idle arcade toy — four men, one jar, sticky peanut butter blobs.
 Tap to chomp. Short runs, modifier picks, Crust Credits meta (stub).
 
-**Design docs (MeniscusMaximus):** [GAME_IDEAS.md #7](https://github.com/subtiliorars-sys/MeniscusMaximus/blob/master/GAME_IDEAS.md) · [MEN_EAT_PB_SLICE.md](https://github.com/subtiliorars-sys/MeniscusMaximus/blob/master/MEN_EAT_PB_SLICE.md)
+**Design docs (MeniscusMaximus):** [GAME_IDEAS.md #7](https://github.com/subtiliorars-sys/MeniscusMaximus/blob/master/GAME_IDEAS.md) Â· [MEN_EAT_PB_SLICE.md](https://github.com/subtiliorars-sys/MeniscusMaximus/blob/master/MEN_EAT_PB_SLICE.md)
 
 **Play:** https://subtiliorars-sys.github.io/men-eat-pb/
+
+
+### First-run tip
+
+Open [Play](https://subtiliorars-sys.github.io/men-eat-pb/) (or `npm run dev`). Keys **1-4** chomp Carl-Ed; Enter/Space confirms; **M** toggles sound; Esc backs out.
 
 ## Quick start
 
@@ -17,7 +22,7 @@ npm run verify   # tsc + tests + build
 
 ## First session
 
-New players: see `docs/FIRST-SESSION.md` for what the first minutes include � and what they deliberately do **not**.
+New players: see `docs/FIRST-SESSION.md` for what the first minutes include — and what they deliberately do **not**.
 
 ## Controls
 
@@ -78,4 +83,4 @@ Next waves: juice/SFX, meta upgrades, Table Events (`WAVES.md`).
 ## Shared asset libraries
 
 **Agents:** do not invent colored-box placeholders when free art exists.
-See [docs/ASSETS.md](docs/ASSETS.md) → `game-visual-assets`, `game-audio-assets`, `game-3d-assets`.
+See [docs/ASSETS.md](docs/ASSETS.md) â†’ `game-visual-assets`, `game-audio-assets`, `game-3d-assets`.
