@@ -134,6 +134,7 @@ export class PicnicScene extends Phaser.Scene {
       .setAlpha(0);
 
     this.createMuteButton();
+    this.installKeyboardControls();
 
     this.overlay = this.createStartOverlay();
     this.eventOverlay = this.createEventOverlay();
@@ -199,6 +200,52 @@ export class PicnicScene extends Phaser.Scene {
 
   private muteLabel(): string {
     return isMuted() ? "🔇 Sound off" : "🔊 Sound on";
+  }
+
+  private installKeyboardControls(): void {
+    this.input.keyboard?.on("keydown", (event: KeyboardEvent) => {
+      if (
+        event.key === " " ||
+        event.key.startsWith("Arrow") ||
+        event.key === "PageUp" ||
+        event.key === "PageDown"
+      ) {
+        event.preventDefault();
+      }
+
+      if (event.key === "m" || event.key === "M") {
+        toggleMuted();
+        if (isMuted()) {
+          stopMusic();
+        } else if (this.state?.running) {
+          startMusic();
+          setMusicFrenzy(this.state.frenzy);
+        }
+        this.muteBtn.setText(this.muteLabel());
+        return;
+      }
+
+      if (event.key === "Escape") {
+        if (document.querySelector("[data-playtest-feedback-dialog]")) {
+          document.querySelector("[data-playtest-feedback-dialog]")?.remove();
+          return;
+        }
+        if (this.tutorialOverlay.visible) {
+          this.finishTutorial();
+        } else if (this.endOverlay.visible) {
+          this.restartRun();
+        }
+        return;
+      }
+
+      const manIndex = Number.parseInt(event.key, 10) - 1;
+      if (manIndex < 0 || manIndex >= MAN_POSITIONS.length || !this.state?.running || this.state.eventPending) {
+        return;
+      }
+      const pos = MAN_POSITIONS[manIndex];
+      const visual = this.manVisuals.find((m) => m.id === pos.id);
+      if (visual) this.onManChomp(pos.id, visual.head, visual.mouth);
+    });
   }
 
   update(_time: number, delta: number): void {
@@ -745,7 +792,7 @@ export class PicnicScene extends Phaser.Scene {
     });
 
     const soundHint = this.add
-      .text(WORLD.width / 2, WORLD.height / 2 + 178, "Sound: tap 🔊 / 🔇 in the top-right anytime.", {
+      .text(WORLD.width / 2, WORLD.height / 2 + 178, "Keys 1–4 chomp Carl–Ed · M toggles sound · Esc closes dialogs.", {
         fontSize: "11px",
         color: "#8b7355",
         align: "center",
