@@ -63,6 +63,23 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
 ];
 
 const STORAGE_KEY = "mep_tutorial_done";
+const FIRST_RUN_TIP_KEY = "mep_first_run_tip";
+
+export function shouldShowFirstRunTip(): boolean {
+  try {
+    return localStorage.getItem(FIRST_RUN_TIP_KEY) !== "1";
+  } catch {
+    return false;
+  }
+}
+
+export function markFirstRunTipShown(): void {
+  try {
+    localStorage.setItem(FIRST_RUN_TIP_KEY, "1");
+  } catch {
+    // ignore quota / private mode
+  }
+}
 
 export function isTutorialCompleted(): boolean {
   try {

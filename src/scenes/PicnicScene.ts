@@ -51,7 +51,12 @@ import {
   type RunState,
   type TableEventId,
 } from "../sim/types.js";
-import { isTutorialCompleted, TutorialState } from "../tutorial/tutorial.js";
+import {
+  isTutorialCompleted,
+  markFirstRunTipShown,
+  shouldShowFirstRunTip,
+  TutorialState,
+} from "../tutorial/tutorial.js";
 
 const COLORS = {
   skin: 0xf5d0a9,
@@ -1061,7 +1066,34 @@ export class PicnicScene extends Phaser.Scene {
     this.updateHud();
     this.updateJarFill();
     this.updateManHighlights();
-    if (!tutorialMode) startMusic();
+    if (!tutorialMode) {
+      startMusic();
+      this.maybeShowFirstRunTip();
+    }
+  }
+
+  /** One-time keyboard shortcut reminder during the player's first real run. */
+  private maybeShowFirstRunTip(): void {
+    if (!shouldShowFirstRunTip()) return;
+    markFirstRunTipShown();
+    const tip = this.add
+      .text(WORLD.width / 2, WORLD.height - 18, "Tip: 1–4 chomp Carl–Ed · M toggles sound", {
+        fontFamily: "system-ui, sans-serif",
+        fontSize: "12px",
+        color: "#5c3d1e",
+        backgroundColor: "#fff8dc",
+        padding: { x: 8, y: 4 },
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(25)
+      .setAlpha(0.92);
+    this.tweens.add({
+      targets: tip,
+      alpha: 0,
+      delay: 5500,
+      duration: 1200,
+      onComplete: () => tip.destroy(),
+    });
   }
 
   private stopTutorialPractice(): void {
